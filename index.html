@@ -110,7 +110,6 @@
       { key: "supper", label: "宵夜", color: "#7C3AED" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
-      { key: "investment", label: "投資", color: "#BE123C" },
       { key: "others", label: "其他", color: "#D97706" },
     ];
     const DEFAULT_REPORT_CATEGORIES = [
@@ -120,7 +119,6 @@
       { key: "dinner", label: "晚餐", color: "#E45757" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
-      { key: "investment", label: "投資", color: "#BE123C" },
       { key: "others", label: "其他", color: "#D97706" },
     ];
     const params = new URLSearchParams(location.search);
@@ -253,10 +251,11 @@
       const expenseCategories = payload.categories || DEFAULT_CATEGORIES;
       const reportCategories = payload.report_categories || DEFAULT_REPORT_CATEGORIES;
       const summary = payload.summary || {};
-      const total = summary.month_total ?? dataRows.reduce((acc, row) => acc + Number(row.total || 0), 0);
+      const visibleTotal = (row) => expenseCategories.reduce((acc, category) => acc + Number(row[category.key] || 0), 0);
+      const total = summary.month_total ?? dataRows.reduce((acc, row) => acc + visibleTotal(row), 0);
       const average = dataRows.length ? Math.round(total / dataRows.length) : 0;
       const maxRow = dataRows.length
-        ? dataRows.reduce((best, row) => Number(row.total) > Number(best.total) ? row : best, dataRows[0])
+        ? dataRows.reduce((best, row) => visibleTotal(row) > visibleTotal(best) ? row : best, dataRows[0])
         : null;
       const categoryTotals = summary.category_totals || reportCategories.map((category) => ({
         ...category,
@@ -270,7 +269,7 @@
       document.getElementById("average").textContent = money(average);
       document.getElementById("yearTotal").textContent = money(summary.year_total || 0);
       document.getElementById("maxDay").innerHTML = maxRow
-        ? `${displayDate(maxRow.expense_date)}<small>${money(maxRow.total)}</small>`
+        ? `${displayDate(maxRow.expense_date)}<small>${money(visibleTotal(maxRow))}</small>`
         : "尚無";
       document.getElementById("bars").innerHTML = categoryTotals.map((item) => {
         const width = Math.round((Number(item.value || 0) / maxCategory) * 100);
@@ -287,7 +286,7 @@
           <tr>
             <td>${displayDate(row.expense_date)}</td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
-            <td><strong>${Number(row.total || 0).toLocaleString()}</strong></td>
+            <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
           </tr>
         `).join("")
         : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
