@@ -131,6 +131,7 @@
       { key: "supper", label: "宵夜", color: "#7C3AED" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
+      { key: "sport", label: "運動", color: "#84CC16" },
       { key: "others", label: "其他", color: "#D97706" },
     ];
     const DEFAULT_REPORT_CATEGORIES = [
@@ -140,6 +141,7 @@
       { key: "dinner", label: "晚餐", color: "#E45757" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
+      { key: "sport", label: "運動", color: "#84CC16" },
       { key: "investment", label: "投資", color: "#8B5CF6" },
       { key: "others", label: "其他", color: "#D97706" },
     ];
@@ -318,16 +320,17 @@
           </div>
         `;
       }).join("");
-      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
+      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th><th>備註</th></tr>`;
       document.getElementById("rows").innerHTML = dataRows.length
         ? dataRows.map((row) => `
           <tr>
             <td>${displayDate(row.expense_date)}</td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
             <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
+            <td>${escapeHtml(row.note || "")}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
+        : `<tr><td colspan="${expenseCategories.length + 3}" class="empty">這個月份尚無資料</td></tr>`;
       document.getElementById("incomeRows").innerHTML = incomeRows.length
         ? incomeRows.map((row) => `
           <tr>
