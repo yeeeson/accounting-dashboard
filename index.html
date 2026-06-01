@@ -78,6 +78,9 @@
     </form>
     <div class="kpis">
       <div class="card"><div class="label">月合計</div><div class="value" id="monthTotal">0 元</div></div>
+      <div class="card"><div class="label">收入</div><div class="value" id="incomeTotal">0 元</div></div>
+      <div class="card"><div class="label">投資</div><div class="value" id="investmentTotal">0 元</div></div>
+      <div class="card"><div class="label">收支結餘</div><div class="value" id="netTotal">0 元</div></div>
       <div class="card"><div class="label">每日平均</div><div class="value" id="average">0 元</div></div>
       <div class="card"><div class="label">最高單日</div><div class="value" id="maxDay">尚無</div></div>
       <div class="card"><div class="label">年度累計</div><div class="value" id="yearTotal">0 元</div></div>
@@ -96,6 +99,24 @@
         <table>
           <thead id="tableHead"></thead>
           <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card">
+      <div class="label">收入明細</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>日期</th><th>來源</th><th>金額</th></tr></thead>
+          <tbody id="incomeRows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card">
+      <div class="label">投資紀錄</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>日期</th><th>標的</th><th>動作</th><th>金額</th></tr></thead>
+          <tbody id="investmentRows"></tbody>
         </table>
       </div>
     </section>
@@ -119,6 +140,7 @@
       { key: "dinner", label: "晚餐", color: "#E45757" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
+      { key: "investment", label: "投資", color: "#8B5CF6" },
       { key: "others", label: "其他", color: "#D97706" },
     ];
     const params = new URLSearchParams(location.search);
@@ -142,7 +164,16 @@
     function money(value) {
       return `${Number(value || 0).toLocaleString()} 元`;
     }
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
     function reportValue(row, key) {
+      if (key === "investment") return Number(row.investment || 0);
       if (key === "food") {
         return Number(row.breakfast || 0) + Number(row.lunch || 0) + Number(row.dinner || 0) + Number(row.supper || 0);
       }
@@ -248,39 +279,46 @@
     function render(payload) {
       const monthText = payload.month;
       const dataRows = payload.rows || [];
+      const incomeRows = payload.incomes || [];
+      const investmentRows = payload.investment_records || [];
       const expenseCategories = payload.categories || DEFAULT_CATEGORIES;
       const reportCategories = payload.report_categories || DEFAULT_REPORT_CATEGORIES;
       const summary = payload.summary || {};
       const visibleTotal = (row) => expenseCategories.reduce((acc, category) => acc + Number(row[category.key] || 0), 0);
       const total = summary.month_total ?? dataRows.reduce((acc, row) => acc + visibleTotal(row), 0);
-      const average = dataRows.length ? Math.round(total / dataRows.length) : 0;
+      const activeDays = summary.days || dataRows.length;
+      const average = activeDays ? Math.round(total / activeDays) : 0;
       const maxRow = dataRows.length
         ? dataRows.reduce((best, row) => visibleTotal(row) > visibleTotal(best) ? row : best, dataRows[0])
         : null;
+      const maxDay = summary.max_day || (maxRow ? { date: maxRow.expense_date, total: visibleTotal(maxRow) } : null);
       const categoryTotals = summary.category_totals || reportCategories.map((category) => ({
         ...category,
         value: dataRows.reduce((acc, row) => acc + reportValue(row, category.key), 0),
       }));
       const maxCategory = Math.max(...categoryTotals.map((item) => item.value), 1);
       document.getElementById("title").textContent = `${displayMonth(monthText)} 記帳 Dashboard`;
-      document.getElementById("subtitle").textContent = `共 ${dataRows.length} 筆，手機版讀取 Supabase`;
+      document.getElementById("subtitle").textContent = `支出 ${dataRows.length} 筆，收入 ${incomeRows.length} 筆，投資 ${investmentRows.length} 筆`;
       document.getElementById("monthInput").value = monthText.replace("-", "");
       document.getElementById("monthTotal").textContent = money(total);
+      document.getElementById("incomeTotal").textContent = money(summary.income_total || 0);
+      document.getElementById("investmentTotal").textContent = money(summary.investment_total || 0);
+      document.getElementById("netTotal").textContent = money(summary.net_total || 0);
       document.getElementById("average").textContent = money(average);
       document.getElementById("yearTotal").textContent = money(summary.year_total || 0);
-      document.getElementById("maxDay").innerHTML = maxRow
-        ? `${displayDate(maxRow.expense_date)}<small>${money(visibleTotal(maxRow))}</small>`
+      document.getElementById("maxDay").innerHTML = maxDay
+        ? `${displayDate(maxDay.date)}<small>${money(maxDay.total)}</small>`
         : "尚無";
       document.getElementById("bars").innerHTML = categoryTotals.map((item) => {
         const width = Math.round((Number(item.value || 0) / maxCategory) * 100);
         return `
           <div class="bar-row">
-            <div class="bar-head"><span>${item.label}</span><strong>${money(item.value)}</strong></div>
+            <div class="bar-head"><span>${escapeHtml(item.label)}</span><strong>${money(item.value)}</strong></div>
             <div class="bar"><span style="width:${width}%; background:${item.color};"></span></div>
           </div>
         `;
       }).join("");
-      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${category.label}</th>`).join("")}<th>合計</th></tr>`;
+      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
       document.getElementById("rows").innerHTML = dataRows.length
         ? dataRows.map((row) => `
           <tr>
@@ -290,6 +328,25 @@
           </tr>
         `).join("")
         : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
+      document.getElementById("incomeRows").innerHTML = incomeRows.length
+        ? incomeRows.map((row) => `
+          <tr>
+            <td>${displayDate(row.income_date)}</td>
+            <td>${escapeHtml(row.source)}</td>
+            <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="3" class="empty">這個月份尚無收入</td></tr>`;
+      document.getElementById("investmentRows").innerHTML = investmentRows.length
+        ? investmentRows.map((row) => `
+          <tr>
+            <td>${displayDate(row.record_date)}</td>
+            <td>${escapeHtml(row.asset)}</td>
+            <td>${escapeHtml(row.action)}</td>
+            <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="4" class="empty">這個月份尚無投資紀錄</td></tr>`;
       drawMonthChart(summary.monthly_totals || []);
     }
     document.getElementById("queryForm").addEventListener("submit", (event) => {
