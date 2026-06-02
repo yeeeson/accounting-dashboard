@@ -115,7 +115,7 @@
       <div class="label">投資紀錄</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>日期</th><th>標的</th><th>動作</th><th>金額</th></tr></thead>
+          <thead><tr><th>日期</th><th>標的</th><th>動作</th><th>金額</th><th>股數</th><th>成本</th></tr></thead>
           <tbody id="investmentRows"></tbody>
         </table>
       </div>
@@ -347,9 +347,11 @@
             <td>${escapeHtml(row.asset)}</td>
             <td>${escapeHtml(row.action)}</td>
             <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+            <td>${row.quantity ? Number(row.quantity).toLocaleString() : ""}</td>
+            <td>${row.price ? Number(row.price).toLocaleString() : ""}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="4" class="empty">這個月份尚無投資紀錄</td></tr>`;
+        : `<tr><td colspan="6" class="empty">這個月份尚無投資紀錄</td></tr>`;
       drawMonthChart(summary.monthly_totals || []);
     }
     document.getElementById("queryForm").addEventListener("submit", (event) => {
