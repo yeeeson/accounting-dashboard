@@ -52,14 +52,16 @@
     .bar span { display: block; height: 100%; border-radius: 999px; }
     .chart { width: 100%; height: 240px; display: block; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 9px 6px; border-bottom: 1px solid #dfe5dc; text-align: right; white-space: nowrap; }
+    th, td { padding: 9px 6px; border-bottom: 1px solid #dfe5dc; text-align: right; white-space: nowrap; vertical-align: middle; }
     th:first-child, td:first-child { text-align: left; }
     th { color: #667085; background: #fafbf8; }
     .table-wrap { overflow-x: auto; }
-    .date-cell { display: inline-flex; align-items: center; gap: 6px; }
+    .date-col { min-width: 106px; }
+    .date-cell { display: inline-grid; grid-template-columns: minmax(74px, max-content) 18px; align-items: center; gap: 4px; }
     .note-btn {
       width: 18px;
       height: 18px;
+      min-width: 18px;
       border: 1px solid #9aa89a;
       border-radius: 50%;
       background: #f5f7f2;
@@ -69,9 +71,23 @@
       line-height: 16px;
       text-align: center;
       cursor: pointer;
+      padding: 0;
     }
+    .note-btn[aria-expanded="true"] { background: #0f766e; border-color: #0f766e; color: #fff; }
     .note-row[hidden] { display: none; }
-    .note-cell { text-align: left; color: #475467; background: #fafbf8; white-space: normal; }
+    .note-cell {
+      text-align: left;
+      color: #475467;
+      background: #fafbf8;
+      white-space: normal;
+      padding: 10px 12px;
+      line-height: 1.55;
+    }
+    .note-panel {
+      border-left: 3px solid #0f766e;
+      padding-left: 10px;
+      overflow-wrap: anywhere;
+    }
     .empty { text-align: center; color: #667085; padding: 24px 6px; }
     .error { color: #b42318; white-space: pre-wrap; }
     @media (max-width: 420px) {
@@ -400,18 +416,18 @@
           </div>
         `;
       }).join("");
-      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
+      document.getElementById("tableHead").innerHTML = `<tr><th class="date-col">日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
       document.getElementById("rows").innerHTML = dataRows.length
         ? dataRows.map((row, index) => {
           const noteId = `note-${index}`;
-          const noteButton = row.note ? `<button class="note-btn" type="button" aria-label="備註" onclick="toggleNote('${noteId}')">i</button>` : "";
+          const noteButton = row.note ? `<button class="note-btn" type="button" aria-label="備註" aria-expanded="false" aria-controls="${noteId}" onclick="toggleNote('${noteId}', this)">i</button>` : "";
           return `
           <tr>
-            <td><span class="date-cell">${displayDate(row.expense_date)}${noteButton}</span></td>
+            <td class="date-col"><span class="date-cell"><span>${displayDate(row.expense_date)}</span>${noteButton}</span></td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
             <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
           </tr>
-          ${row.note ? `<tr class="note-row" id="${noteId}" hidden><td class="note-cell" colspan="${expenseCategories.length + 2}">${escapeHtml(row.note)}</td></tr>` : ""}
+          ${row.note ? `<tr class="note-row" id="${noteId}" hidden><td class="note-cell" colspan="${expenseCategories.length + 2}"><div class="note-panel">${escapeHtml(row.note)}</div></td></tr>` : ""}
         `;
         }).join("")
         : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
@@ -439,9 +455,11 @@
         : `<tr><td colspan="7" class="empty">這個月份尚無投資紀錄</td></tr>`;
       drawMonthChart(summary.monthly_totals || []);
     }
-    function toggleNote(id) {
+    function toggleNote(id, button) {
       const row = document.getElementById(id);
-      if (row) row.hidden = !row.hidden;
+      if (!row) return;
+      row.hidden = !row.hidden;
+      if (button) button.setAttribute("aria-expanded", String(!row.hidden));
     }
     document.getElementById("queryForm").addEventListener("submit", (event) => {
       event.preventDefault();
