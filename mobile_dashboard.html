@@ -50,7 +50,7 @@
     .bar-head { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; margin-bottom: 6px; }
     .bar { height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
     .bar span { display: block; height: 100%; border-radius: 999px; }
-    .chart { width: 100%; height: 210px; display: block; }
+    .chart { width: 100%; height: 240px; display: block; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 9px 6px; border-bottom: 1px solid #dfe5dc; text-align: right; white-space: nowrap; }
     th:first-child, td:first-child { text-align: left; }
@@ -235,6 +235,14 @@
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       return { ctx, width: rect.width, height: rect.height };
     }
+    function shortMoney(value) {
+      const amount = Math.round(Number(value || 0));
+      if (Math.abs(amount) >= 10000) {
+        const wan = amount / 10000;
+        return `${Number.isInteger(wan) ? wan : wan.toFixed(1)}萬`;
+      }
+      return amount.toLocaleString();
+    }
     function drawMonthChart(items) {
       const canvas = document.getElementById("monthChart");
       const { ctx, width, height } = resizeCanvas(canvas);
@@ -247,35 +255,91 @@
         ctx.fillText("尚無資料", width / 2, height / 2);
         return;
       }
-      const pad = { top: 16, right: 14, bottom: 44, left: 54 };
+      const data = items.map((item) => ({ ...item, total: Number(item.total || 0) }));
+      const pad = { top: 34, right: 18, bottom: 48, left: 54 };
       const chartW = width - pad.left - pad.right;
       const chartH = height - pad.top - pad.bottom;
-      const max = Math.max(...items.map((item) => item.total), 100);
-      const gap = 8;
-      const barW = Math.max(10, (chartW - gap * (items.length - 1)) / items.length);
+      const rawMin = Math.min(...data.map((item) => item.total));
+      const rawMax = Math.max(...data.map((item) => item.total));
+      const rawRange = rawMax - rawMin;
+      const padding = Math.max(rawRange * 0.28, rawMax * 0.08, 100);
+      const min = Math.max(0, rawMin - padding);
+      const max = rawRange === 0 ? rawMax + padding : rawMax + padding;
+      const range = Math.max(max - min, 1);
+      const xFor = (index) => pad.left + (data.length === 1 ? chartW / 2 : (chartW * index) / (data.length - 1));
+      const yFor = (value) => pad.top + chartH - ((value - min) / range) * chartH;
+
       ctx.strokeStyle = "#dfe5dc";
       ctx.fillStyle = "#667085";
       ctx.font = "12px Microsoft JhengHei, sans-serif";
-      for (let i = 0; i <= 3; i++) {
-        const y = pad.top + (chartH * i) / 3;
+      for (let i = 0; i <= 4; i++) {
+        const value = max - (range * i) / 4;
+        const y = pad.top + (chartH * i) / 4;
         ctx.beginPath();
         ctx.moveTo(pad.left, y);
         ctx.lineTo(width - pad.right, y);
         ctx.stroke();
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
-        ctx.fillText(Math.round(max * (1 - i / 3)).toLocaleString(), pad.left - 8, y);
+        ctx.fillText(shortMoney(value), pad.left - 8, y);
       }
-      items.forEach((item, index) => {
-        const h = (chartH * item.total) / max;
-        const x = pad.left + index * (barW + gap);
-        const y = pad.top + chartH - h;
-        ctx.fillStyle = "#0f766e";
-        ctx.fillRect(x, y, barW, h);
+
+      const points = data.map((item, index) => ({ ...item, x: xFor(index), y: yFor(item.total) }));
+      if (points.length > 1) {
+        ctx.beginPath();
+        points.forEach((point, index) => {
+          if (index === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        });
+        ctx.lineTo(points[points.length - 1].x, pad.top + chartH);
+        ctx.lineTo(points[0].x, pad.top + chartH);
+        ctx.closePath();
+        const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
+        gradient.addColorStop(0, "rgba(15, 118, 110, 0.20)");
+        gradient.addColorStop(1, "rgba(15, 118, 110, 0.02)");
+        ctx.fillStyle = gradient;
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.strokeStyle = "#0f766e";
+      ctx.lineWidth = 3;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+
+      points.forEach((point, index) => {
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#0f766e";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
         ctx.fillStyle = "#667085";
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillText(displayMonth(item.month), x + barW / 2, pad.top + chartH + 14);
+        ctx.font = "12px Microsoft JhengHei, sans-serif";
+        ctx.fillText(displayMonth(point.month), point.x, pad.top + chartH + 14);
+
+        ctx.fillStyle = "#17202a";
+        ctx.textBaseline = "bottom";
+        ctx.font = "700 12px Microsoft JhengHei, sans-serif";
+        ctx.fillText(shortMoney(point.total), point.x, point.y - 12);
+
+        if (index > 0) {
+          const delta = point.total - points[index - 1].total;
+          const deltaText = `${delta >= 0 ? "+" : "-"}${shortMoney(Math.abs(delta))}`;
+          ctx.fillStyle = delta >= 0 ? "#dc6803" : "#0f766e";
+          ctx.textBaseline = "top";
+          ctx.font = "12px Microsoft JhengHei, sans-serif";
+          ctx.fillText(deltaText, point.x, point.y + 11);
+        }
       });
     }
     function render(payload) {
