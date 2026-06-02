@@ -56,6 +56,22 @@
     th:first-child, td:first-child { text-align: left; }
     th { color: #667085; background: #fafbf8; }
     .table-wrap { overflow-x: auto; }
+    .date-cell { display: inline-flex; align-items: center; gap: 6px; }
+    .note-btn {
+      width: 18px;
+      height: 18px;
+      border: 1px solid #9aa89a;
+      border-radius: 50%;
+      background: #f5f7f2;
+      color: #0f766e;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 16px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .note-row[hidden] { display: none; }
+    .note-cell { text-align: left; color: #475467; background: #fafbf8; white-space: normal; }
     .empty { text-align: center; color: #667085; padding: 24px 6px; }
     .error { color: #b42318; white-space: pre-wrap; }
     @media (max-width: 420px) {
@@ -115,7 +131,7 @@
       <div class="label">投資紀錄</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>日期</th><th>標的</th><th>動作</th><th>金額</th><th>股數</th><th>成本</th></tr></thead>
+          <thead><tr><th>日期</th><th>標的</th><th>股票名稱</th><th>動作</th><th>金額</th><th>股數</th><th>成本</th></tr></thead>
           <tbody id="investmentRows"></tbody>
         </table>
       </div>
@@ -384,17 +400,21 @@
           </div>
         `;
       }).join("");
-      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th><th>備註</th></tr>`;
+      document.getElementById("tableHead").innerHTML = `<tr><th>日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
       document.getElementById("rows").innerHTML = dataRows.length
-        ? dataRows.map((row) => `
+        ? dataRows.map((row, index) => {
+          const noteId = `note-${index}`;
+          const noteButton = row.note ? `<button class="note-btn" type="button" aria-label="備註" onclick="toggleNote('${noteId}')">i</button>` : "";
+          return `
           <tr>
-            <td>${displayDate(row.expense_date)}</td>
+            <td><span class="date-cell">${displayDate(row.expense_date)}${noteButton}</span></td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
             <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
-            <td>${escapeHtml(row.note || "")}</td>
           </tr>
-        `).join("")
-        : `<tr><td colspan="${expenseCategories.length + 3}" class="empty">這個月份尚無資料</td></tr>`;
+          ${row.note ? `<tr class="note-row" id="${noteId}" hidden><td class="note-cell" colspan="${expenseCategories.length + 2}">${escapeHtml(row.note)}</td></tr>` : ""}
+        `;
+        }).join("")
+        : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
       document.getElementById("incomeRows").innerHTML = incomeRows.length
         ? incomeRows.map((row) => `
           <tr>
@@ -409,14 +429,19 @@
           <tr>
             <td>${displayDate(row.record_date)}</td>
             <td>${escapeHtml(row.asset)}</td>
+            <td>${escapeHtml(row.stock_name || row.display_name || "")}</td>
             <td>${escapeHtml(row.action)}</td>
             <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
             <td>${row.quantity ? Number(row.quantity).toLocaleString() : ""}</td>
             <td>${row.price ? Number(row.price).toLocaleString() : ""}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="6" class="empty">這個月份尚無投資紀錄</td></tr>`;
+        : `<tr><td colspan="7" class="empty">這個月份尚無投資紀錄</td></tr>`;
       drawMonthChart(summary.monthly_totals || []);
+    }
+    function toggleNote(id) {
+      const row = document.getElementById(id);
+      if (row) row.hidden = !row.hidden;
     }
     document.getElementById("queryForm").addEventListener("submit", (event) => {
       event.preventDefault();
