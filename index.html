@@ -51,6 +51,13 @@
     .bar { height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
     .bar span { display: block; height: 100%; border-radius: 999px; }
     .chart { width: 100%; height: 240px; display: block; }
+    .budget-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 10px; }
+    .budget-item { border: 1px solid #e5eadf; border-radius: 8px; padding: 10px; background: #fafbf8; }
+    .budget-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+    .budget-name { font-weight: 800; }
+    .budget-balance { font-size: 20px; font-weight: 900; color: #17202a; }
+    .budget-balance.negative { color: #b42318; }
+    .budget-meta { display: flex; justify-content: space-between; gap: 8px; color: #667085; font-size: 12px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 9px 6px; border-bottom: 1px solid #dfe5dc; text-align: right; white-space: nowrap; vertical-align: middle; }
     th:first-child, td:first-child { text-align: left; }
@@ -122,7 +129,11 @@
       <div id="bars"></div>
     </section>
     <section class="card">
-      <div class="label">月比較</div>
+      <div class="label">預算餘額</div>
+      <div id="budgetBalances" class="budget-grid"></div>
+    </section>
+    <section class="card">
+      <div class="label">月比較（收支淨額）</div>
       <canvas class="chart" id="monthChart"></canvas>
     </section>
     <section class="card">
@@ -147,7 +158,7 @@
       <div class="label">投資紀錄</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>日期</th><th>標的</th><th>股票名稱</th><th>動作</th><th>金額</th><th>股數</th><th>成本</th></tr></thead>
+          <thead><tr><th>日期</th><th>標的</th><th>股票名稱</th><th>動作</th><th>金額</th><th>股數</th></tr></thead>
           <tbody id="investmentRows"></tbody>
         </table>
       </div>
@@ -161,6 +172,7 @@
       { key: "lunch", label: "午餐", color: "#0F766E" },
       { key: "dinner", label: "晚餐", color: "#E45757" },
       { key: "supper", label: "宵夜", color: "#7C3AED" },
+      { key: "drink", label: "飲料", color: "#06B6D4" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
       { key: "sport", label: "運動", color: "#84CC16" },
@@ -171,6 +183,7 @@
       { key: "breakfast", label: "早餐", color: "#2563EB" },
       { key: "lunch", label: "午餐", color: "#0F766E" },
       { key: "dinner", label: "晚餐", color: "#E45757" },
+      { key: "drink", label: "飲料", color: "#06B6D4" },
       { key: "transportation", label: "交通費", color: "#0891B2" },
       { key: "daily_supplies", label: "日用品", color: "#16A34A" },
       { key: "sport", label: "運動", color: "#84CC16" },
@@ -294,9 +307,9 @@
       const rawMin = Math.min(...data.map((item) => item.total));
       const rawMax = Math.max(...data.map((item) => item.total));
       const rawRange = rawMax - rawMin;
-      const padding = Math.max(rawRange * 0.28, rawMax * 0.08, 100);
-      const min = Math.max(0, rawMin - padding);
-      const max = rawRange === 0 ? rawMax + padding : rawMax + padding;
+      const padding = Math.max(rawRange * 0.28, Math.max(Math.abs(rawMin), Math.abs(rawMax)) * 0.08, 100);
+      const min = Math.min(0, rawMin - padding);
+      const max = Math.max(0, rawMax + padding);
       const range = Math.max(max - min, 1);
       const xFor = (index) => pad.left + (data.length === 1 ? chartW / 2 : (chartW * index) / (data.length - 1));
       const yFor = (value) => pad.top + chartH - ((value - min) / range) * chartH;
@@ -316,6 +329,19 @@
         ctx.fillText(shortMoney(value), pad.left - 8, y);
       }
 
+      const zeroY = yFor(0);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, zeroY);
+      ctx.lineTo(width - pad.right, zeroY);
+      ctx.strokeStyle = "#98a2b3";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = "#667085";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.font = "12px Microsoft JhengHei, sans-serif";
+      ctx.fillText("0", pad.left - 8, zeroY - 3);
+
       const points = data.map((item, index) => ({ ...item, x: xFor(index), y: yFor(item.total) }));
       if (points.length > 1) {
         ctx.beginPath();
@@ -323,8 +349,9 @@
           if (index === 0) ctx.moveTo(point.x, point.y);
           else ctx.lineTo(point.x, point.y);
         });
-        ctx.lineTo(points[points.length - 1].x, pad.top + chartH);
-        ctx.lineTo(points[0].x, pad.top + chartH);
+        const zeroY = yFor(0);
+        ctx.lineTo(points[points.length - 1].x, zeroY);
+        ctx.lineTo(points[0].x, zeroY);
         ctx.closePath();
         const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
         gradient.addColorStop(0, "rgba(15, 118, 110, 0.20)");
@@ -359,7 +386,7 @@
         ctx.font = "12px Microsoft JhengHei, sans-serif";
         ctx.fillText(displayMonth(point.month), point.x, pad.top + chartH + 14);
 
-        ctx.fillStyle = "#17202a";
+        ctx.fillStyle = point.total >= 0 ? "#0f766e" : "#b42318";
         ctx.textBaseline = "bottom";
         ctx.font = "700 12px Microsoft JhengHei, sans-serif";
         ctx.fillText(shortMoney(point.total), point.x, point.y - 12);
@@ -367,7 +394,7 @@
         if (index > 0) {
           const delta = point.total - points[index - 1].total;
           const deltaText = `${delta >= 0 ? "+" : "-"}${shortMoney(Math.abs(delta))}`;
-          ctx.fillStyle = delta >= 0 ? "#dc6803" : "#0f766e";
+          ctx.fillStyle = delta >= 0 ? "#0f766e" : "#b42318";
           ctx.textBaseline = "top";
           ctx.font = "12px Microsoft JhengHei, sans-serif";
           ctx.fillText(deltaText, point.x, point.y + 11);
@@ -385,7 +412,7 @@
       const visibleTotal = (row) => expenseCategories.reduce((acc, category) => acc + Number(row[category.key] || 0), 0);
       const total = summary.month_total ?? dataRows.reduce((acc, row) => acc + visibleTotal(row), 0);
       const activeDays = summary.days || dataRows.length;
-      const average = activeDays ? Math.round(total / activeDays) : 0;
+      const average = summary.daily_average ?? (activeDays ? Math.round((summary.cash_expense_total ?? total) / activeDays) : 0);
       const maxRow = dataRows.length
         ? dataRows.reduce((best, row) => visibleTotal(row) > visibleTotal(best) ? row : best, dataRows[0])
         : null;
@@ -416,6 +443,25 @@
           </div>
         `;
       }).join("");
+      const budgetItems = summary.budget_balances || [];
+      document.getElementById("budgetBalances").innerHTML = budgetItems.length
+        ? budgetItems.map((item) => {
+          const balance = Number(item.balance || 0);
+          const budget = Number(item.budget || 0);
+          const spent = Number(item.spent || 0);
+          const usedWidth = budget > 0 ? Math.min(100, Math.round((Math.max(spent, 0) / budget) * 100)) : 0;
+          return `
+            <div class="budget-item">
+              <div class="budget-head">
+                <span class="budget-name">${escapeHtml(item.label)}</span>
+                <span class="budget-balance ${balance < 0 ? "negative" : ""}">${money(balance)}</span>
+              </div>
+              <div class="bar"><span style="width:${usedWidth}%; background:${item.color || "#0f766e"};"></span></div>
+              <div class="budget-meta"><span>已用 ${money(spent)}</span><span>預算 ${money(budget)}</span></div>
+            </div>
+          `;
+        }).join("")
+        : `<div class="empty">尚無預算資料</div>`;
       document.getElementById("tableHead").innerHTML = `<tr><th class="date-col">日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
       document.getElementById("rows").innerHTML = dataRows.length
         ? dataRows.map((row, index) => {
@@ -449,10 +495,9 @@
             <td>${escapeHtml(row.action)}</td>
             <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
             <td>${row.quantity ? Number(row.quantity).toLocaleString() : ""}</td>
-            <td>${row.price ? Number(row.price).toLocaleString() : ""}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="7" class="empty">這個月份尚無投資紀錄</td></tr>`;
+        : `<tr><td colspan="6" class="empty">這個月份尚無投資紀錄</td></tr>`;
       drawMonthChart(summary.monthly_totals || []);
     }
     function toggleNote(id, button) {
