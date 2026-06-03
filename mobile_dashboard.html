@@ -118,6 +118,7 @@
     <div class="kpis">
       <div class="card"><div class="label">月合計</div><div class="value" id="monthTotal">0 元</div></div>
       <div class="card"><div class="label">收入</div><div class="value" id="incomeTotal">0 元</div></div>
+      <div class="card"><div class="label">儲蓄</div><div class="value" id="savingsTotal">0 元</div></div>
       <div class="card"><div class="label">投資</div><div class="value" id="investmentTotal">0 元</div></div>
       <div class="card"><div class="label">收支結餘</div><div class="value" id="netTotal">0 元</div></div>
       <div class="card"><div class="label">每日平均</div><div class="value" id="average">0 元</div></div>
@@ -427,6 +428,7 @@
       document.getElementById("monthInput").value = monthText.replace("-", "");
       document.getElementById("monthTotal").textContent = money(total);
       document.getElementById("incomeTotal").textContent = money(summary.income_total || 0);
+      document.getElementById("savingsTotal").textContent = money(summary.savings_total || 0);
       document.getElementById("investmentTotal").textContent = money(summary.investment_total || 0);
       document.getElementById("netTotal").textContent = money(summary.net_total || 0);
       document.getElementById("average").textContent = money(average);
