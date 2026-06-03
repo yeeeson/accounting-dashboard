@@ -120,10 +120,10 @@
       <div class="card"><div class="label">收入</div><div class="value" id="incomeTotal">0 元</div></div>
       <div class="card"><div class="label">儲蓄</div><div class="value" id="savingsTotal">0 元</div></div>
       <div class="card"><div class="label">投資</div><div class="value" id="investmentTotal">0 元</div></div>
-      <div class="card"><div class="label">收支結餘</div><div class="value" id="netTotal">0 元</div></div>
+      <div class="card"><div class="label">消費總額</div><div class="value" id="netTotal">0 元</div></div>
       <div class="card"><div class="label">每日平均</div><div class="value" id="average">0 元</div></div>
       <div class="card"><div class="label">最高單日</div><div class="value" id="maxDay">尚無</div></div>
-      <div class="card"><div class="label">年度累計</div><div class="value" id="yearTotal">0 元</div></div>
+      <div class="card"><div class="label">年度淨額</div><div class="value" id="yearTotal">0 元</div></div>
     </div>
     <section class="card">
       <div class="label">分類統計</div>
@@ -411,7 +411,7 @@
       const reportCategories = payload.report_categories || DEFAULT_REPORT_CATEGORIES;
       const summary = payload.summary || {};
       const visibleTotal = (row) => expenseCategories.reduce((acc, category) => acc + Number(row[category.key] || 0), 0);
-      const total = summary.month_total ?? dataRows.reduce((acc, row) => acc + visibleTotal(row), 0);
+      const total = summary.month_total ?? ((summary.income_total || 0) - dataRows.reduce((acc, row) => acc + visibleTotal(row), 0));
       const activeDays = summary.days || dataRows.length;
       const average = summary.daily_average ?? (activeDays ? Math.round((summary.cash_expense_total ?? total) / activeDays) : 0);
       const maxRow = dataRows.length
@@ -430,7 +430,7 @@
       document.getElementById("incomeTotal").textContent = money(summary.income_total || 0);
       document.getElementById("savingsTotal").textContent = money(summary.savings_total || 0);
       document.getElementById("investmentTotal").textContent = money(summary.investment_total || 0);
-      document.getElementById("netTotal").textContent = money(summary.net_total || 0);
+      document.getElementById("netTotal").textContent = money(summary.consumption_total ?? summary.cash_expense_total ?? 0);
       document.getElementById("average").textContent = money(average);
       document.getElementById("yearTotal").textContent = money(summary.year_total || 0);
       document.getElementById("maxDay").innerHTML = maxDay
