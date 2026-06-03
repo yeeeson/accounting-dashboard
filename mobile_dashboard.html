@@ -222,7 +222,7 @@
     function reportValue(row, key) {
       if (key === "investment") return Number(row.investment || 0);
       if (key === "food") {
-        return Number(row.breakfast || 0) + Number(row.lunch || 0) + Number(row.dinner || 0) + Number(row.supper || 0);
+        return Number(row.breakfast || 0) + Number(row.lunch || 0) + Number(row.dinner || 0) + Number(row.supper || 0) + Number(row.drink || 0);
       }
       return Number(row[key] || 0);
     }
@@ -449,14 +449,14 @@
           const balance = Number(item.balance || 0);
           const budget = Number(item.budget || 0);
           const spent = Number(item.spent || 0);
-          const usedWidth = budget > 0 ? Math.min(100, Math.round((Math.max(spent, 0) / budget) * 100)) : 0;
+          const remainingWidth = budget > 0 ? Math.max(0, Math.min(100, Math.round((Math.max(balance, 0) / budget) * 100))) : 0;
           return `
             <div class="budget-item">
               <div class="budget-head">
                 <span class="budget-name">${escapeHtml(item.label)}</span>
                 <span class="budget-balance ${balance < 0 ? "negative" : ""}">${money(balance)}</span>
               </div>
-              <div class="bar"><span style="width:${usedWidth}%; background:${item.color || "#0f766e"};"></span></div>
+              <div class="bar"><span style="width:${remainingWidth}%; background:${balance < 0 ? "#b42318" : item.color || "#0f766e"};"></span></div>
               <div class="budget-meta"><span>已用 ${money(spent)}</span><span>預算 ${money(budget)}</span></div>
             </div>
           `;
