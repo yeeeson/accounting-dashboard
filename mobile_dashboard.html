@@ -156,6 +156,15 @@
       </div>
     </section>
     <section class="card">
+      <div class="label" id="fixedExpenseTitle">固定支出</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>名稱</th><th>扣款日</th><th>金額</th></tr></thead>
+          <tbody id="fixedExpenseRows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="card">
       <div class="label">投資紀錄</div>
       <div class="table-wrap">
         <table>
@@ -406,6 +415,7 @@
       const monthText = payload.month;
       const dataRows = payload.rows || [];
       const incomeRows = payload.incomes || [];
+      const fixedExpenseRows = payload.fixed_expenses || [];
       const investmentRows = payload.investment_records || [];
       const expenseCategories = payload.categories || DEFAULT_CATEGORIES;
       const reportCategories = payload.report_categories || DEFAULT_REPORT_CATEGORIES;
@@ -424,7 +434,7 @@
       }));
       const maxCategory = Math.max(...categoryTotals.map((item) => item.value), 1);
       document.getElementById("title").textContent = `${displayMonth(monthText)} 記帳 Dashboard`;
-      document.getElementById("subtitle").textContent = `支出 ${dataRows.length} 筆，收入 ${incomeRows.length} 筆，投資 ${investmentRows.length} 筆`;
+      document.getElementById("subtitle").textContent = `支出 ${dataRows.length} 筆，收入 ${incomeRows.length} 筆，固定支出 ${fixedExpenseRows.length} 筆，投資 ${investmentRows.length} 筆`;
       document.getElementById("monthInput").value = monthText.replace("-", "");
       document.getElementById("monthTotal").textContent = money(total);
       document.getElementById("incomeTotal").textContent = money(summary.income_total || 0);
@@ -488,6 +498,16 @@
           </tr>
         `).join("")
         : `<tr><td colspan="3" class="empty">這個月份尚無收入</td></tr>`;
+      document.getElementById("fixedExpenseTitle").textContent = `固定支出 ${money(summary.fixed_expense_total || 0)}`;
+      document.getElementById("fixedExpenseRows").innerHTML = fixedExpenseRows.length
+        ? fixedExpenseRows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.name)}</td>
+            <td>${row.due_day ? `${Number(row.due_day)} 日` : ""}</td>
+            <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+          </tr>
+        `).join("")
+        : `<tr><td colspan="3" class="empty">本月沒有固定支出</td></tr>`;
       document.getElementById("investmentRows").innerHTML = investmentRows.length
         ? investmentRows.map((row) => `
           <tr>
