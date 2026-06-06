@@ -44,9 +44,10 @@
     main {
       position: relative;
       z-index: 1;
-      max-width: 960px;
+      width: 100%;
+      max-width: none;
       margin: 0 auto;
-      padding: 34px 22px 72px;
+      padding: 34px clamp(12px, 2vw, 34px) 72px;
     }
     header { margin-bottom: 24px; }
     h1 {
@@ -269,7 +270,7 @@
     .chart {
       display: block;
       width: 100%;
-      height: 220px;
+      height: 260px;
     }
     table {
       width: 100%;
@@ -622,104 +623,74 @@
         return;
       }
       const data = items.map((item) => ({ ...item, total: Number(item.total || 0) }));
-      const pad = { top: 34, right: 18, bottom: 48, left: 54 };
+      const pad = { top: 26, right: 20, bottom: 42, left: 60 };
       const chartW = width - pad.left - pad.right;
       const chartH = height - pad.top - pad.bottom;
-      const rawMin = Math.min(...data.map((item) => item.total));
-      const rawMax = Math.max(...data.map((item) => item.total));
-      const rawRange = rawMax - rawMin;
-      const padding = Math.max(rawRange * 0.28, Math.max(Math.abs(rawMin), Math.abs(rawMax)) * 0.08, 100);
-      const min = Math.min(0, rawMin - padding);
-      const max = Math.max(0, rawMax + padding);
+      const maxAbs = Math.max(...data.map((item) => Math.abs(item.total)), 100) * 1.18;
+      const min = -maxAbs;
+      const max = maxAbs;
       const range = Math.max(max - min, 1);
-      const xFor = (index) => pad.left + (data.length === 1 ? chartW / 2 : (chartW * index) / (data.length - 1));
+      const slotW = chartW / data.length;
+      const barW = Math.max(12, Math.min(54, slotW * 0.42));
+      const xFor = (index) => pad.left + slotW * index + slotW / 2;
       const yFor = (value) => pad.top + chartH - ((value - min) / range) * chartH;
 
-      ctx.strokeStyle = rule;
-      ctx.fillStyle = muted;
       ctx.font = "12px Microsoft JhengHei, sans-serif";
-      for (let i = 0; i <= 4; i++) {
-        const value = max - (range * i) / 4;
-        const y = pad.top + (chartH * i) / 4;
+      [-1, -0.5, 0, 0.5, 1].forEach((ratio) => {
+        const value = maxAbs * ratio;
+        const y = yFor(value);
         ctx.beginPath();
         ctx.moveTo(pad.left, y);
         ctx.lineTo(width - pad.right, y);
+        ctx.strokeStyle = ratio === 0 ? "#c2b5a2" : rule;
+        ctx.lineWidth = ratio === 0 ? 1.5 : 1;
         ctx.stroke();
-        ctx.textAlign = "right";
-        ctx.textBaseline = "middle";
-        ctx.fillText(shortMoney(value), pad.left - 8, y);
-      }
+        if (ratio !== 0) {
+          ctx.fillStyle = muted;
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+          ctx.fillText(shortMoney(value), pad.left - 8, y);
+        }
+      });
 
       const zeroY = yFor(0);
-      ctx.beginPath();
-      ctx.moveTo(pad.left, zeroY);
-      ctx.lineTo(width - pad.right, zeroY);
-      ctx.strokeStyle = "#c2b5a2";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
       ctx.fillStyle = muted;
       ctx.textAlign = "right";
       ctx.textBaseline = "bottom";
       ctx.font = "12px Microsoft JhengHei, sans-serif";
       ctx.fillText("0", pad.left - 8, zeroY - 3);
 
-      const points = data.map((item, index) => ({ ...item, x: xFor(index), y: yFor(item.total) }));
-      if (points.length > 1) {
-        ctx.beginPath();
-        points.forEach((point, index) => {
-          if (index === 0) ctx.moveTo(point.x, point.y);
-          else ctx.lineTo(point.x, point.y);
-        });
-        const zeroY = yFor(0);
-        ctx.lineTo(points[points.length - 1].x, zeroY);
-        ctx.lineTo(points[0].x, zeroY);
-        ctx.closePath();
-        const gradient = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-        gradient.addColorStop(0, "rgba(82, 115, 94, 0.22)");
-        gradient.addColorStop(1, "rgba(82, 115, 94, 0.02)");
+      data.forEach((item, index) => {
+        const centerX = xFor(index);
+        const barLeft = centerX - barW / 2;
+        const valueY = yFor(item.total);
+        const isPositive = item.total >= 0;
+        const barTop = isPositive ? valueY : zeroY;
+        const barH = Math.max(2, Math.abs(zeroY - valueY));
+        const color = isPositive ? sage : rust;
+        const gradient = ctx.createLinearGradient(0, barTop, 0, barTop + barH);
+        gradient.addColorStop(0, color);
+        gradient.addColorStop(1, `${color}99`);
         ctx.fillStyle = gradient;
-        ctx.fill();
-      }
-
-      ctx.beginPath();
-      points.forEach((point, index) => {
-        if (index === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
-      });
-      ctx.strokeStyle = sage;
-      ctx.lineWidth = 3;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.stroke();
-
-      points.forEach((point, index) => {
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = sage;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        if (typeof ctx.roundRect === "function") {
+          ctx.beginPath();
+          ctx.roundRect(barLeft, barTop, barW, barH, isPositive ? [5, 5, 0, 0] : [0, 0, 5, 5]);
+          ctx.fill();
+        } else {
+          ctx.fillRect(barLeft, barTop, barW, barH);
+        }
 
         ctx.fillStyle = muted;
-        ctx.textAlign = "center";
         ctx.textBaseline = "top";
         ctx.font = "12px Microsoft JhengHei, sans-serif";
-        ctx.fillText(displayMonth(point.month), point.x, pad.top + chartH + 14);
+        ctx.textAlign = "center";
+        ctx.fillText(displayMonth(item.month), centerX, pad.top + chartH + 14);
 
-        ctx.fillStyle = point.total >= 0 ? sage : rust;
-        ctx.textBaseline = "bottom";
+        ctx.fillStyle = color;
         ctx.font = "700 12px Microsoft JhengHei, sans-serif";
-        ctx.fillText(shortMoney(point.total), point.x, point.y - 12);
-
-        if (index > 0) {
-          const delta = point.total - points[index - 1].total;
-          const deltaText = `${delta >= 0 ? "+" : "-"}${shortMoney(Math.abs(delta))}`;
-          ctx.fillStyle = delta >= 0 ? sage : rust;
-          ctx.textBaseline = "top";
-          ctx.font = "12px Microsoft JhengHei, sans-serif";
-          ctx.fillText(deltaText, point.x, point.y + 11);
-        }
+        ctx.textBaseline = isPositive ? "bottom" : "top";
+        const valueLabel = `${isPositive ? "+" : "-"}${shortMoney(Math.abs(item.total))}`;
+        ctx.fillText(valueLabel, centerX, isPositive ? barTop - 6 : barTop + barH + 6);
       });
     }
     function render(payload) {
