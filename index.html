@@ -52,7 +52,7 @@
     header { margin-bottom: 24px; }
     h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 32px;
       line-height: 1.18;
       letter-spacing: 0;
       font-weight: 800;
@@ -99,8 +99,8 @@
     .kpis {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 12px;
-      margin-bottom: 22px;
+      gap: 16px;
+      margin-bottom: 24px;
     }
     .kpi {
       position: relative;
@@ -108,7 +108,7 @@
       background: var(--surface);
       border: 1px solid var(--rule);
       border-radius: var(--radius);
-      padding: 16px 18px;
+      padding: 22px 24px;
       box-shadow: var(--shadow);
       overflow: hidden;
     }
@@ -143,7 +143,7 @@
     .value {
       margin-top: 0;
       color: var(--ink);
-      font-size: 24px;
+      font-size: clamp(30px, 2.25vw, 42px);
       line-height: 1.08;
       font-weight: 900;
       overflow-wrap: anywhere;
@@ -153,12 +153,12 @@
       display: block;
       margin-top: 6px;
       color: var(--muted);
-      font-size: 14px;
+      font-size: clamp(16px, 1.15vw, 20px);
       font-weight: 700;
     }
     .value.positive { color: var(--sage); }
     .value.negative { color: var(--rust); }
-    .kpi-sub { margin-top: 7px; color: var(--faint); font-size: 11px; }
+    .kpi-sub { margin-top: 8px; color: var(--faint); font-size: 12px; }
     .kpi.income .dot { background: var(--sage); }
     .kpi.savings .dot { background: var(--sky); }
     .kpi.investment .dot { background: var(--amber); }
@@ -215,8 +215,8 @@
     .section-body { padding: 16px 20px; }
     .section.collapsed .section-body { display: none; }
     .cat-list { display: flex; flex-direction: column; gap: 9px; }
-    .cat-item { display: grid; grid-template-columns: 72px minmax(70px, 1fr) 76px; align-items: center; gap: 10px; }
-    .cat-name { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cat-item { display: grid; grid-template-columns: 88px minmax(90px, 1fr) 108px; align-items: center; gap: 12px; }
+    .cat-name { color: var(--muted); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .cat-bar-wrap,
     .bar {
       height: 7px;
@@ -233,7 +233,7 @@
     }
     .cat-amount {
       color: var(--ink);
-      font-size: 12px;
+      font-size: 15px;
       font-weight: 800;
       text-align: right;
       font-variant-numeric: tabular-nums;
@@ -254,7 +254,7 @@
     .budget-balance,
     .budget-nums {
       color: var(--ink);
-      font-size: 13px;
+      font-size: 15px;
       font-weight: 900;
       font-variant-numeric: tabular-nums;
     }
@@ -351,6 +351,15 @@
       main { padding: 28px 14px 54px; }
       .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .two-col { grid-template-columns: 1fr; }
+      h1 { font-size: 26px; }
+      .kpi { padding: 16px 18px; }
+      .value { font-size: 24px; }
+      .value small { font-size: 14px; }
+      .cat-item { grid-template-columns: 72px minmax(70px, 1fr) 86px; gap: 10px; }
+      .cat-name { font-size: 12px; }
+      .cat-amount { font-size: 12px; }
+      .budget-balance,
+      .budget-nums { font-size: 13px; }
     }
     @media (max-width: 440px) {
       main { padding-left: 10px; padding-right: 10px; }
@@ -361,6 +370,8 @@
       .kpi { padding: 14px 13px; }
       .value { font-size: 21px; }
       .cat-item { grid-template-columns: 62px minmax(52px, 1fr) 70px; gap: 8px; }
+      .cat-name,
+      .cat-amount { font-size: 12px; }
       .section-head { padding-left: 14px; padding-right: 14px; }
       .section-body { padding-left: 14px; padding-right: 14px; }
     }
