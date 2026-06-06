@@ -71,7 +71,9 @@
       box-shadow: var(--shadow);
     }
     .query-label { color: var(--faint); font-size: 12px; white-space: nowrap; }
-    input {
+    input,
+    select,
+    textarea {
       min-width: 0;
       flex: 1;
       border: 0;
@@ -83,7 +85,9 @@
       font-size: 15px;
       font-weight: 700;
     }
-    input::placeholder { color: var(--faint); font-weight: 400; }
+    input::placeholder,
+    textarea::placeholder { color: var(--faint); font-weight: 400; }
+    textarea { min-height: 42px; resize: vertical; }
     button {
       border: 0;
       border-radius: 7px;
@@ -96,6 +100,60 @@
       cursor: pointer;
     }
     button:hover { background: #476754; }
+    .entry-form {
+      display: block;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .entry-top {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .entry-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .entry-field {
+      display: grid;
+      gap: 5px;
+      align-content: start;
+    }
+    .entry-field label {
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .entry-field input,
+    .entry-field select,
+    .entry-field textarea {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .entry-field.wide { grid-column: span 2; }
+    .entry-field.full { grid-column: 1 / -1; }
+    .entry-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .entry-status {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: pre-wrap;
+    }
+    .entry-status.is-error { color: var(--rust); }
+    [hidden] { display: none !important; }
     .kpis {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -351,6 +409,8 @@
       main { padding: 28px 14px 54px; }
       .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .two-col { grid-template-columns: 1fr; }
+      .entry-top { grid-template-columns: 1fr; }
+      .entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       h1 { font-size: 26px; }
       .kpi { padding: 16px 18px; }
       .value { font-size: 24px; }
@@ -369,6 +429,8 @@
       .kpis { gap: 9px; }
       .kpi { padding: 14px 13px; }
       .value { font-size: 21px; }
+      .entry-grid { grid-template-columns: 1fr; }
+      .entry-field.wide { grid-column: span 1; }
       .cat-item { grid-template-columns: 62px minmax(52px, 1fr) 70px; gap: 8px; }
       .cat-name,
       .cat-amount { font-size: 12px; }
@@ -388,12 +450,75 @@
       <input id="monthInput" name="month" inputmode="numeric" maxlength="6" placeholder="例如 202605">
       <button>查詢</button>
     </form>
+    <section class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <h2><span class="section-mark"></span>網頁記帳</h2>
+        <span class="toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <form id="entryForm" class="entry-form">
+          <div class="entry-top">
+            <div class="entry-field">
+              <label for="entryType">記帳類型</label>
+              <select id="entryType" name="type">
+                <option value="expense">日常消費</option>
+                <option value="fixed">固定支出</option>
+                <option value="investment">投資紀錄</option>
+              </select>
+            </div>
+            <div class="entry-field">
+              <label>輸入格式</label>
+              <input id="entryFormat" value="日期 20260606，金額填在對應分類" readonly>
+            </div>
+          </div>
+          <div class="entry-group" data-entry-group="expense">
+            <div class="entry-grid">
+              <div class="entry-field"><label for="expenseDate">日期</label><input id="expenseDate" name="date" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
+              <div class="entry-field"><label for="expenseBreakfast">早餐</label><input id="expenseBreakfast" data-expense-key="breakfast" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseLunch">午餐</label><input id="expenseLunch" data-expense-key="lunch" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseDinner">晚餐</label><input id="expenseDinner" data-expense-key="dinner" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseSupper">宵夜</label><input id="expenseSupper" data-expense-key="supper" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseDrink">飲料</label><input id="expenseDrink" data-expense-key="drink" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseTransportation">交通費</label><input id="expenseTransportation" data-expense-key="transportation" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseDailySupplies">日用品</label><input id="expenseDailySupplies" data-expense-key="daily_supplies" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseSport">運動</label><input id="expenseSport" data-expense-key="sport" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field"><label for="expenseOthers">其他</label><input id="expenseOthers" data-expense-key="others" inputmode="numeric" placeholder="0"></div>
+              <div class="entry-field wide"><label for="expenseNote">備註</label><input id="expenseNote" placeholder="例如 游泳、停車費"></div>
+            </div>
+          </div>
+          <div class="entry-group" data-entry-group="fixed" hidden>
+            <div class="entry-grid">
+              <div class="entry-field"><label for="fixedName">名稱</label><input id="fixedName" placeholder="例如 房租"></div>
+              <div class="entry-field"><label for="fixedAmount">金額</label><input id="fixedAmount" inputmode="numeric" placeholder="12000"></div>
+              <div class="entry-field"><label for="fixedDueDay">扣款日</label><input id="fixedDueDay" inputmode="numeric" maxlength="2" placeholder="5"></div>
+              <div class="entry-field"><label for="fixedCategory">分類</label><input id="fixedCategory" placeholder="可留空"></div>
+              <div class="entry-field full"><label for="fixedNote">備註</label><input id="fixedNote" placeholder="可留空"></div>
+            </div>
+          </div>
+          <div class="entry-group" data-entry-group="investment" hidden>
+            <div class="entry-grid">
+              <div class="entry-field"><label for="investmentDate">日期</label><input id="investmentDate" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
+              <div class="entry-field"><label for="investmentAction">動作</label><select id="investmentAction"><option value="買入">買入</option><option value="賣出">賣出</option></select></div>
+              <div class="entry-field"><label for="investmentAsset">標的</label><input id="investmentAsset" placeholder="例如 2454"></div>
+              <div class="entry-field"><label for="investmentStockName">股票名稱</label><input id="investmentStockName" placeholder="例如 聯發科"></div>
+              <div class="entry-field"><label for="investmentAmount">金額</label><input id="investmentAmount" inputmode="numeric" placeholder="15000"></div>
+              <div class="entry-field"><label for="investmentQuantity">股數</label><input id="investmentQuantity" inputmode="decimal" placeholder="5"></div>
+              <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
+            </div>
+          </div>
+          <div class="entry-actions">
+            <button type="submit">儲存</button>
+            <span id="entryStatus" class="entry-status"></span>
+          </div>
+        </form>
+      </div>
+    </section>
     <div class="kpis">
-      <div class="kpi"><div class="kpi-label">月合計</div><div class="value" id="monthTotal">0 元</div><div class="kpi-sub">收入減日常消費</div></div>
+      <div class="kpi"><div class="kpi-label">月合計</div><div class="value" id="monthTotal">0 元</div><div class="kpi-sub">收入 + 賣出 - 日常 - 固定 - 買入</div></div>
       <div class="kpi income"><div class="kpi-label"><span class="dot"></span>收入</div><div class="value" id="incomeTotal">0 元</div><div class="kpi-sub">本月收入</div></div>
       <div class="kpi savings"><div class="kpi-label"><span class="dot"></span>儲蓄</div><div class="value" id="savingsTotal">0 元</div><div class="kpi-sub">固定支出中的儲蓄</div></div>
-      <div class="kpi investment"><div class="kpi-label"><span class="dot"></span>投資</div><div class="value" id="investmentTotal">0 元</div><div class="kpi-sub">投資紀錄投入</div></div>
-      <div class="kpi expense"><div class="kpi-label"><span class="dot"></span>消費總額</div><div class="value" id="netTotal">0 元</div><div class="kpi-sub">不含固定支出</div></div>
+      <div class="kpi investment"><div class="kpi-label"><span class="dot"></span>投資</div><div class="value" id="investmentTotal">0 元</div><div class="kpi-sub">投資買入金額</div></div>
+      <div class="kpi expense"><div class="kpi-label"><span class="dot"></span>日常消費總額</div><div class="value" id="netTotal">0 元</div><div class="kpi-sub">不含固定支出與投資</div></div>
       <div class="kpi"><div class="kpi-label">每日平均</div><div class="value" id="average">0 元</div><div class="kpi-sub">日常消費平均</div></div>
       <div class="kpi"><div class="kpi-label">最高單日</div><div class="value" id="maxDay">尚無</div><div class="kpi-sub">本月日常消費</div></div>
       <div class="kpi"><div class="kpi-label">年度淨額</div><div class="value" id="yearTotal">0 元</div><div class="kpi-sub">年度收入減日常消費</div></div>
@@ -520,6 +645,10 @@
       const now = new Date();
       return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
     }
+    function currentDateText() {
+      const now = new Date();
+      return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+    }
     function displayDate(isoDate) {
       const [year, month, day] = isoDate.split("-").map(Number);
       return `${year}/${month}/${day}`;
@@ -562,6 +691,94 @@
     function apiUrl(month) {
       const query = new URLSearchParams({ user, token, month, format: "json" });
       return `https://${project}.supabase.co/functions/v1/mobile-dashboard?${query}`;
+    }
+    function apiPostUrl() {
+      const query = new URLSearchParams({ user, token });
+      return `https://${project}.supabase.co/functions/v1/mobile-dashboard?${query}`;
+    }
+    function setEntryStatus(message, isError = false) {
+      const el = document.getElementById("entryStatus");
+      el.textContent = message || "";
+      el.classList.toggle("is-error", Boolean(isError));
+    }
+    function updateEntryType() {
+      const type = document.getElementById("entryType").value;
+      document.querySelectorAll("[data-entry-group]").forEach((group) => {
+        group.hidden = group.dataset.entryGroup !== type;
+      });
+      const format = {
+        expense: "日期 20260606，金額填在對應分類",
+        fixed: "名稱、金額、扣款日，例如 房租 12000 5",
+        investment: "日期、買入/賣出、標的、金額、股數",
+      }[type] || "";
+      document.getElementById("entryFormat").value = format;
+      setEntryStatus("");
+    }
+    function readValue(id) {
+      return document.getElementById(id).value.trim();
+    }
+    function buildEntryPayload() {
+      const type = document.getElementById("entryType").value;
+      if (type === "expense") {
+        const categories = {};
+        document.querySelectorAll("[data-expense-key]").forEach((input) => {
+          const value = input.value.trim();
+          if (value !== "") categories[input.dataset.expenseKey] = value;
+        });
+        return {
+          type,
+          date: readValue("expenseDate"),
+          categories,
+          note: readValue("expenseNote"),
+        };
+      }
+      if (type === "fixed") {
+        return {
+          type,
+          name: readValue("fixedName"),
+          amount: readValue("fixedAmount"),
+          due_day: readValue("fixedDueDay"),
+          category: readValue("fixedCategory"),
+          note: readValue("fixedNote"),
+        };
+      }
+      return {
+        type,
+        date: readValue("investmentDate"),
+        action: readValue("investmentAction"),
+        asset: readValue("investmentAsset"),
+        stock_name: readValue("investmentStockName"),
+        amount: readValue("investmentAmount"),
+        quantity: readValue("investmentQuantity"),
+        note: readValue("investmentNote"),
+      };
+    }
+    async function submitEntry(event) {
+      event.preventDefault();
+      setEntryStatus("儲存中");
+      try {
+        const response = await fetch(apiPostUrl(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(buildEntryPayload()),
+        });
+        const text = await response.text();
+        let payload;
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          throw new Error(text || "API 回傳格式不正確。");
+        }
+        if (!response.ok || !payload.ok) throw new Error(payload.error || text);
+        setEntryStatus(payload.message || "已儲存");
+        if (payload.month) {
+          await loadDashboard(String(payload.month).replace("-", ""));
+        } else {
+          await loadDashboard(document.getElementById("monthInput").value.trim() || currentMonth());
+        }
+      } catch (error) {
+        setEntryStatus(error instanceof Error ? error.message : String(error), true);
+      }
     }
     async function loadDashboard(month) {
       setError("");
@@ -832,7 +1049,12 @@
       event.preventDefault();
       loadDashboard(document.getElementById("monthInput").value.trim() || currentMonth());
     });
+    document.getElementById("entryType").addEventListener("change", updateEntryType);
+    document.getElementById("entryForm").addEventListener("submit", submitEntry);
     document.getElementById("monthInput").value = initialMonth;
+    document.getElementById("expenseDate").value = currentDateText();
+    document.getElementById("investmentDate").value = currentDateText();
+    updateEntryType();
     loadDashboard(initialMonth);
     window.addEventListener("resize", () => {
       const month = document.getElementById("monthInput").value.trim() || currentMonth();
