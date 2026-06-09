@@ -7,21 +7,47 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     :root {
+      color-scheme: light;
       --paper: #f4f2ec;
       --surface: #fffdf8;
       --surface-soft: #faf7ef;
+      --field: #fff;
       --ink: #282316;
       --muted: #716855;
       --faint: #a79b87;
       --rule: #ddd4c4;
+      --track: #e8e0d2;
+      --hover: #f8f3ea;
       --sage: #52735e;
       --sage-soft: #e6eee6;
       --rust: #ba513a;
       --amber: #c4862f;
       --sky: #3d7195;
       --violet: #7c5cc4;
+      --increase: var(--rust);
+      --deduction: var(--sage);
       --radius: 10px;
       --shadow: 0 1px 4px rgba(40, 35, 22, 0.08), 0 12px 28px rgba(40, 35, 22, 0.06);
+    }
+    body[data-theme="dark"] {
+      color-scheme: dark;
+      --paper: #181914;
+      --surface: #23251f;
+      --surface-soft: #2c2e27;
+      --field: #1d1f1a;
+      --ink: #f3eadc;
+      --muted: #c8baa3;
+      --faint: #9d927f;
+      --rule: #494237;
+      --track: #3b382f;
+      --hover: #2b3028;
+      --sage: #8bb99c;
+      --sage-soft: #26352b;
+      --rust: #e17a62;
+      --amber: #d7a657;
+      --sky: #7aa9c7;
+      --violet: #a88cf0;
+      --shadow: 0 1px 4px rgba(0, 0, 0, 0.18), 0 16px 32px rgba(0, 0, 0, 0.22);
     }
     body {
       margin: 0;
@@ -49,7 +75,13 @@
       margin: 0 auto;
       padding: 34px clamp(12px, 2vw, 34px) 72px;
     }
-    header { margin-bottom: 24px; }
+    header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
     h1 {
       margin: 0;
       font-size: 32px;
@@ -100,6 +132,15 @@
       cursor: pointer;
     }
     button:hover { background: #476754; }
+    .theme-toggle {
+      flex: 0 0 auto;
+      padding: 8px 13px;
+      border: 1px solid var(--rule);
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: var(--shadow);
+    }
+    .theme-toggle:hover { background: var(--surface-soft); }
     .entry-form {
       display: block;
       margin: 0;
@@ -137,7 +178,7 @@
       padding: 9px 10px;
       border: 1px solid var(--rule);
       border-radius: 8px;
-      background: #fff;
+      background: var(--field);
     }
     .entry-field.wide { grid-column: span 2; }
     .entry-field.full { grid-column: 1 / -1; }
@@ -214,13 +255,13 @@
       font-size: clamp(16px, 1.15vw, 20px);
       font-weight: 700;
     }
-    .value.positive { color: var(--sage); }
-    .value.negative { color: var(--rust); }
+    .value.positive { color: var(--increase); }
+    .value.negative { color: var(--deduction); }
     .kpi-sub { margin-top: 8px; color: var(--faint); font-size: 12px; }
-    .kpi.income .dot { background: var(--sage); }
+    .kpi.income .dot { background: var(--increase); }
     .kpi.savings .dot { background: var(--sky); }
-    .kpi.investment .dot { background: var(--amber); }
-    .kpi.expense .dot { background: var(--rust); }
+    .kpi.investment .dot,
+    .kpi.expense .dot { background: var(--deduction); }
     .two-col {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -236,6 +277,7 @@
       overflow: hidden;
     }
     .two-col .section { margin-top: 0; }
+    .entry-section { margin-bottom: 16px; }
     .section-head {
       display: flex;
       align-items: center;
@@ -278,7 +320,7 @@
     .cat-bar-wrap,
     .bar {
       height: 7px;
-      background: #e8e0d2;
+      background: var(--track);
       border-radius: 999px;
       overflow: hidden;
     }
@@ -316,7 +358,7 @@
       font-weight: 900;
       font-variant-numeric: tabular-nums;
     }
-    .budget-balance.negative { color: var(--rust); }
+    .budget-balance.negative { color: var(--deduction); }
     .budget-meta {
       display: flex;
       justify-content: space-between;
@@ -338,7 +380,7 @@
     th,
     td {
       padding: 10px 8px;
-      border-bottom: 1px solid #eee7dc;
+      border-bottom: 1px solid var(--rule);
       color: var(--ink);
       text-align: right;
       white-space: nowrap;
@@ -352,7 +394,7 @@
       font-size: 11px;
       font-weight: 800;
     }
-    tbody tr:hover td { background: #f8f3ea; }
+    tbody tr:hover td { background: var(--hover); }
     .table-wrap { overflow-x: auto; }
     .date-col { min-width: 108px; }
     .date-cell {
@@ -367,9 +409,9 @@
       width: 18px;
       height: 18px;
       min-width: 18px;
-      border: 1px solid #b8ab98;
+      border: 1px solid var(--rule);
       border-radius: 50%;
-      background: #f5f1e8;
+      background: var(--surface-soft);
       color: var(--sage);
       font-size: 12px;
       font-weight: 900;
@@ -397,8 +439,8 @@
       padding-left: 10px;
       overflow-wrap: anywhere;
     }
-    .amount-pos { color: var(--sage); }
-    .amount-neg { color: var(--rust); }
+    .amount-pos { color: var(--increase); }
+    .amount-neg { color: var(--deduction); }
     .empty { text-align: center; color: var(--faint); padding: 26px 8px; }
     .error {
       color: var(--rust);
@@ -407,6 +449,7 @@
     }
     @media (max-width: 760px) {
       main { padding: 28px 14px 54px; }
+      header { align-items: center; }
       .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .two-col { grid-template-columns: 1fr; }
       .entry-top { grid-template-columns: 1fr; }
@@ -423,6 +466,7 @@
     }
     @media (max-width: 440px) {
       main { padding-left: 10px; padding-right: 10px; }
+      header { gap: 10px; }
       h1 { font-size: 23px; }
       form { padding: 10px; }
       button { padding: 9px 14px; }
@@ -442,15 +486,18 @@
 <body>
   <main>
     <header>
-      <h1 id="title">記帳 <span>Dashboard</span></h1>
-      <p class="sub" id="subtitle">讀取 Supabase 資料中</p>
+      <div>
+        <h1 id="title">記帳 <span>Dashboard</span></h1>
+        <p class="sub" id="subtitle">讀取 Supabase 資料中</p>
+      </div>
+      <button class="theme-toggle" id="themeToggle" type="button">深色</button>
     </header>
     <form id="queryForm">
       <label class="query-label" for="monthInput">查詢月份</label>
       <input id="monthInput" name="month" inputmode="numeric" maxlength="6" placeholder="例如 202605">
       <button>查詢</button>
     </form>
-    <section class="section">
+    <section class="section entry-section">
       <div class="section-head" onclick="toggleSection(this)">
         <h2><span class="section-mark"></span>網頁記帳</h2>
         <span class="toggle">▾</span>
@@ -515,7 +562,7 @@
     </section>
     <div class="kpis">
       <div class="kpi"><div class="kpi-label">月合計</div><div class="value" id="monthTotal">0 元</div><div class="kpi-sub">收入 + 賣出 - 日常 - 固定 - 買入</div></div>
-      <div class="kpi income"><div class="kpi-label"><span class="dot"></span>收入</div><div class="value" id="incomeTotal">0 元</div><div class="kpi-sub">本月收入</div></div>
+      <div class="kpi income"><div class="kpi-label"><span class="dot"></span>收入</div><div class="value" id="incomeTotal">0 元</div><div class="kpi-sub">本月收入 + 投資賣出</div></div>
       <div class="kpi savings"><div class="kpi-label"><span class="dot"></span>儲蓄</div><div class="value" id="savingsTotal">0 元</div><div class="kpi-sub">固定支出中的儲蓄</div></div>
       <div class="kpi investment"><div class="kpi-label"><span class="dot"></span>投資</div><div class="value" id="investmentTotal">0 元</div><div class="kpi-sub">投資買入金額</div></div>
       <div class="kpi expense"><div class="kpi-label"><span class="dot"></span>日常消費總額</div><div class="value" id="netTotal">0 元</div><div class="kpi-sub">不含固定支出與投資</div></div>
@@ -640,6 +687,19 @@
     const user = params.get("user") || "";
     const token = params.get("token") || "";
     const initialMonth = params.get("month") || currentMonth();
+    const THEME_KEY = "accounting-dashboard-theme";
+    let lastMonthlyTotals = [];
+
+    function applyTheme(theme) {
+      const safeTheme = theme === "dark" ? "dark" : "light";
+      document.body.dataset.theme = safeTheme;
+      document.getElementById("themeToggle").textContent = safeTheme === "dark" ? "淺色" : "深色";
+      localStorage.setItem(THEME_KEY, safeTheme);
+      if (lastMonthlyTotals.length) drawMonthChart(lastMonthlyTotals);
+    }
+    function toggleTheme() {
+      applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
+    }
 
     function currentMonth() {
       const now = new Date();
@@ -675,6 +735,10 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+    }
+    function isSellAction(action) {
+      const text = String(action ?? "").trim().toLowerCase();
+      return text.includes("賣") || text.includes("sell") || text.includes("sold");
     }
     function reportValue(row, key) {
       if (key === "investment") return Number(row.investment || 0);
@@ -836,9 +900,11 @@
     function drawMonthChart(items) {
       const canvas = document.getElementById("monthChart");
       const { ctx, width, height } = resizeCanvas(canvas);
-      const css = getComputedStyle(document.documentElement);
+      const css = getComputedStyle(document.body);
       const sage = css.getPropertyValue("--sage").trim() || "#52735e";
       const rust = css.getPropertyValue("--rust").trim() || "#ba513a";
+      const increase = css.getPropertyValue("--increase").trim() || rust;
+      const deduction = css.getPropertyValue("--deduction").trim() || sage;
       const rule = css.getPropertyValue("--rule").trim() || "#ddd4c4";
       const muted = css.getPropertyValue("--muted").trim() || "#716855";
       ctx.clearRect(0, 0, width, height);
@@ -895,7 +961,7 @@
         const isPositive = item.total >= 0;
         const barTop = isPositive ? valueY : zeroY;
         const barH = Math.max(2, Math.abs(zeroY - valueY));
-        const color = isPositive ? sage : rust;
+        const color = isPositive ? increase : deduction;
         const gradient = ctx.createLinearGradient(0, barTop, 0, barTop + barH);
         gradient.addColorStop(0, color);
         gradient.addColorStop(1, `${color}99`);
@@ -927,9 +993,23 @@
       const incomeRows = payload.incomes || [];
       const fixedExpenseRows = payload.fixed_expenses || [];
       const investmentRows = payload.investment_records || [];
+      const investmentSellRows = investmentRows.filter((row) => isSellAction(row.action));
+      const incomeDetailRows = [
+        ...incomeRows.map((row) => ({
+          date: row.income_date,
+          source: row.source,
+          amount: row.amount,
+        })),
+        ...investmentSellRows.map((row) => ({
+          date: row.record_date,
+          source: `投資賣出：${row.stock_name || row.display_name || row.asset}`,
+          amount: row.amount,
+        })),
+      ].sort((a, b) => String(a.date).localeCompare(String(b.date)));
       const expenseCategories = payload.categories || DEFAULT_CATEGORIES;
       const reportCategories = payload.report_categories || DEFAULT_REPORT_CATEGORIES;
       const summary = payload.summary || {};
+      const incomeDisplayTotal = Number(summary.income_total || 0) + Number(summary.investment_sell_total || 0);
       const visibleTotal = (row) => expenseCategories.reduce((acc, category) => acc + Number(row[category.key] || 0), 0);
       const total = summary.month_total ?? ((summary.income_total || 0) - dataRows.reduce((acc, row) => acc + visibleTotal(row), 0));
       const activeDays = summary.days || dataRows.length;
@@ -944,12 +1024,12 @@
       }));
       const maxCategory = Math.max(...categoryTotals.map((item) => item.value), 1);
       document.getElementById("title").innerHTML = `${displayMonth(monthText)} 記帳 <span>Dashboard</span>`;
-      document.getElementById("subtitle").textContent = `支出 ${dataRows.length} 筆，收入 ${incomeRows.length} 筆，固定支出 ${fixedExpenseRows.length} 筆，投資 ${investmentRows.length} 筆`;
+      document.getElementById("subtitle").textContent = `支出 ${dataRows.length} 筆，收入 ${incomeDetailRows.length} 筆，固定支出 ${fixedExpenseRows.length} 筆，投資 ${investmentRows.length} 筆`;
       document.getElementById("monthInput").value = monthText.replace("-", "");
       setMoney("monthTotal", total, { colorBySign: true });
-      setMoney("incomeTotal", summary.income_total || 0, { positive: Number(summary.income_total || 0) > 0 });
+      setMoney("incomeTotal", incomeDisplayTotal, { positive: incomeDisplayTotal > 0 });
       setMoney("savingsTotal", summary.savings_total || 0);
-      setMoney("investmentTotal", summary.investment_total || 0);
+      setMoney("investmentTotal", summary.investment_total || 0, { negative: Number(summary.investment_total || 0) > 0 });
       setMoney("netTotal", summary.consumption_total ?? summary.cash_expense_total ?? 0, { negative: Number(summary.consumption_total ?? summary.cash_expense_total ?? 0) > 0 });
       setMoney("average", average);
       setMoney("yearTotal", summary.year_total || 0, { colorBySign: true });
@@ -1002,10 +1082,10 @@
         `;
         }).join("")
         : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
-      document.getElementById("incomeRows").innerHTML = incomeRows.length
-        ? incomeRows.map((row) => `
+      document.getElementById("incomeRows").innerHTML = incomeDetailRows.length
+        ? incomeDetailRows.map((row) => `
           <tr>
-            <td>${displayDate(row.income_date)}</td>
+            <td>${displayDate(row.date)}</td>
             <td>${escapeHtml(row.source)}</td>
             <td class="amount-pos"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
           </tr>
@@ -1028,12 +1108,13 @@
             <td>${escapeHtml(row.asset)}</td>
             <td>${escapeHtml(row.stock_name || row.display_name || "")}</td>
             <td>${escapeHtml(row.action)}</td>
-            <td class="${String(row.action || "").includes("賣") ? "amount-pos" : "amount-neg"}"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+            <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
             <td>${row.quantity ? Number(row.quantity).toLocaleString() : ""}</td>
           </tr>
         `).join("")
         : `<tr><td colspan="6" class="empty">這個月份尚無投資紀錄</td></tr>`;
-      drawMonthChart(summary.monthly_totals || []);
+      lastMonthlyTotals = summary.monthly_totals || [];
+      drawMonthChart(lastMonthlyTotals);
     }
     function toggleNote(id, button) {
       const row = document.getElementById(id);
@@ -1049,11 +1130,13 @@
       event.preventDefault();
       loadDashboard(document.getElementById("monthInput").value.trim() || currentMonth());
     });
+    document.getElementById("themeToggle").addEventListener("click", toggleTheme);
     document.getElementById("entryType").addEventListener("change", updateEntryType);
     document.getElementById("entryForm").addEventListener("submit", submitEntry);
     document.getElementById("monthInput").value = initialMonth;
     document.getElementById("expenseDate").value = currentDateText();
     document.getElementById("investmentDate").value = currentDateText();
+    applyTheme(localStorage.getItem(THEME_KEY) || "light");
     updateEntryType();
     loadDashboard(initialMonth);
     window.addEventListener("resize", () => {
