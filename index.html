@@ -546,8 +546,8 @@
             <div class="entry-grid">
               <div class="entry-field"><label for="investmentDate">日期</label><input id="investmentDate" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
               <div class="entry-field"><label for="investmentAction">動作</label><select id="investmentAction"><option value="買入">買入</option><option value="賣出">賣出</option></select></div>
-              <div class="entry-field"><label for="investmentAsset">標的</label><input id="investmentAsset" placeholder="例如 2454"></div>
-              <div class="entry-field"><label for="investmentStockName">股票名稱</label><input id="investmentStockName" placeholder="例如 聯發科"></div>
+              <div class="entry-field"><label for="investmentAsset">股票代碼</label><input id="investmentAsset" placeholder="例如 2454，可留空"></div>
+              <div class="entry-field"><label for="investmentStockName">股票名稱</label><input id="investmentStockName" placeholder="例如 聯發科，可留空"></div>
               <div class="entry-field"><label for="investmentAmount">金額</label><input id="investmentAmount" inputmode="numeric" placeholder="15000"></div>
               <div class="entry-field"><label for="investmentQuantity">股數</label><input id="investmentQuantity" inputmode="decimal" placeholder="5"></div>
               <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
@@ -773,7 +773,7 @@
       const format = {
         expense: "日期 20260606，金額填在對應分類",
         fixed: "名稱、金額、扣款日，例如 房租 12000 5",
-        investment: "日期、買入/賣出、標的、金額、股數",
+        investment: "日期、買入/賣出、股票代碼或名稱、金額、股數",
       }[type] || "";
       document.getElementById("entryFormat").value = format;
       setEntryStatus("");
