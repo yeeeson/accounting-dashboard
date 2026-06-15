@@ -439,6 +439,36 @@
       padding-left: 10px;
       overflow-wrap: anywhere;
     }
+    .action-col {
+      width: 48px;
+      text-align: center;
+    }
+    .delete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 1px solid var(--rule);
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      box-shadow: none;
+    }
+    .delete-btn:hover {
+      background: var(--surface-soft);
+      color: var(--deduction);
+    }
+    .delete-btn svg {
+      width: 15px;
+      height: 15px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .amount-pos { color: var(--increase); }
     .amount-neg { color: var(--deduction); }
     .empty { text-align: center; color: var(--faint); padding: 26px 8px; }
@@ -621,7 +651,7 @@
       <div class="section-body" style="padding: 0;">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>日期</th><th>來源</th><th>金額</th></tr></thead>
+            <thead><tr><th>日期</th><th>來源</th><th>金額</th><th class="action-col">操作</th></tr></thead>
             <tbody id="incomeRows"></tbody>
           </table>
         </div>
@@ -635,7 +665,7 @@
       <div class="section-body" style="padding: 0;">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>名稱</th><th>扣款日</th><th>金額</th></tr></thead>
+            <thead><tr><th>名稱</th><th>扣款日</th><th>金額</th><th class="action-col">操作</th></tr></thead>
             <tbody id="fixedExpenseRows"></tbody>
           </table>
         </div>
@@ -649,7 +679,7 @@
       <div class="section-body" style="padding: 0;">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>日期</th><th>標的</th><th>股票名稱</th><th>動作</th><th>金額</th><th>股數</th></tr></thead>
+            <thead><tr><th>日期</th><th>標的</th><th>股票名稱</th><th>動作</th><th>金額</th><th>股數</th><th class="action-col">操作</th></tr></thead>
             <tbody id="investmentRows"></tbody>
           </table>
         </div>
@@ -735,6 +765,20 @@
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+    }
+    function trashButton(target, id, label) {
+      if (!id) return "";
+      return `
+        <button class="delete-btn" type="button" data-delete-target="${escapeHtml(target)}" data-delete-id="${escapeHtml(id)}" data-delete-label="${escapeHtml(label)}" aria-label="刪除${escapeHtml(label)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4h8v2"></path>
+            <path d="M6 6l1 15h10l1-15"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+          </svg>
+        </button>
+      `;
     }
     function isSellAction(action) {
       const text = String(action ?? "").trim().toLowerCase();
@@ -840,6 +884,32 @@
         } else {
           await loadDashboard(document.getElementById("monthInput").value.trim() || currentMonth());
         }
+      } catch (error) {
+        setEntryStatus(error instanceof Error ? error.message : String(error), true);
+      }
+    }
+    async function deleteRecord(target, id, label) {
+      if (!id) return;
+      const readableLabel = label || "這筆紀錄";
+      if (!confirm(`確定要刪除${readableLabel}嗎？`)) return;
+      setEntryStatus("刪除中");
+      const month = document.getElementById("monthInput").value.trim() || currentMonth();
+      try {
+        const response = await fetch(apiPostUrl(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "delete", target, id, month }),
+        });
+        const text = await response.text();
+        let payload;
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          throw new Error(text || "API 回傳格式不正確。");
+        }
+        if (!response.ok || !payload.ok) throw new Error(payload.error || text);
+        setEntryStatus(payload.message || "已刪除");
+        await loadDashboard(String(payload.month || month).replace("-", ""));
       } catch (error) {
         setEntryStatus(error instanceof Error ? error.message : String(error), true);
       }
@@ -996,14 +1066,20 @@
       const investmentSellRows = investmentRows.filter((row) => isSellAction(row.action));
       const incomeDetailRows = [
         ...incomeRows.map((row) => ({
+          id: row.id,
+          target: "income",
           date: row.income_date,
           source: row.source,
           amount: row.amount,
+          deleteLabel: `收入 ${row.source}`,
         })),
         ...investmentSellRows.map((row) => ({
+          id: row.id,
+          target: "investment",
           date: row.record_date,
           source: `投資賣出：${row.stock_name || row.display_name || row.asset}`,
           amount: row.amount,
+          deleteLabel: `投資賣出 ${row.stock_name || row.display_name || row.asset}`,
         })),
       ].sort((a, b) => String(a.date).localeCompare(String(b.date)));
       const expenseCategories = payload.categories || DEFAULT_CATEGORIES;
@@ -1067,30 +1143,33 @@
           `;
         }).join("")
         : `<div class="empty">尚無預算資料</div>`;
-      document.getElementById("tableHead").innerHTML = `<tr><th class="date-col">日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th></tr>`;
+      document.getElementById("tableHead").innerHTML = `<tr><th class="date-col">日期</th>${expenseCategories.map((category) => `<th>${escapeHtml(category.label)}</th>`).join("")}<th>合計</th><th class="action-col">操作</th></tr>`;
       document.getElementById("rows").innerHTML = dataRows.length
         ? dataRows.map((row, index) => {
           const noteId = `note-${index}`;
           const noteButton = row.note ? `<button class="note-btn" type="button" aria-label="備註" aria-expanded="false" aria-controls="${noteId}" onclick="toggleNote('${noteId}', this)">i</button>` : "";
+          const deleteButton = trashButton("expense", row.id, `${displayDate(row.expense_date)} 日常消費`);
           return `
           <tr>
             <td class="date-col"><span class="date-cell"><span>${displayDate(row.expense_date)}</span>${noteButton}</span></td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
             <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
+            <td class="action-col">${deleteButton}</td>
           </tr>
-          ${row.note ? `<tr class="note-row" id="${noteId}" hidden><td class="note-cell" colspan="${expenseCategories.length + 2}"><div class="note-panel">${escapeHtml(row.note)}</div></td></tr>` : ""}
+          ${row.note ? `<tr class="note-row" id="${noteId}" hidden><td class="note-cell" colspan="${expenseCategories.length + 3}"><div class="note-panel">${escapeHtml(row.note)}</div></td></tr>` : ""}
         `;
         }).join("")
-        : `<tr><td colspan="${expenseCategories.length + 2}" class="empty">這個月份尚無資料</td></tr>`;
+        : `<tr><td colspan="${expenseCategories.length + 3}" class="empty">這個月份尚無資料</td></tr>`;
       document.getElementById("incomeRows").innerHTML = incomeDetailRows.length
         ? incomeDetailRows.map((row) => `
           <tr>
             <td>${displayDate(row.date)}</td>
             <td>${escapeHtml(row.source)}</td>
             <td class="amount-pos"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+            <td class="action-col">${trashButton(row.target, row.id, row.deleteLabel)}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="3" class="empty">這個月份尚無收入</td></tr>`;
+        : `<tr><td colspan="4" class="empty">這個月份尚無收入</td></tr>`;
       document.getElementById("fixedExpenseTitle").textContent = `固定支出 ${money(summary.fixed_expense_total || 0)}`;
       document.getElementById("fixedExpenseRows").innerHTML = fixedExpenseRows.length
         ? fixedExpenseRows.map((row) => `
@@ -1098,9 +1177,10 @@
             <td>${escapeHtml(row.name)}</td>
             <td>${row.due_day ? `${Number(row.due_day)} 日` : ""}</td>
             <td class="amount-neg"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
+            <td class="action-col">${trashButton("fixed", row.id, `固定支出 ${row.name}`)}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="3" class="empty">本月沒有固定支出</td></tr>`;
+        : `<tr><td colspan="4" class="empty">本月沒有固定支出</td></tr>`;
       document.getElementById("investmentRows").innerHTML = investmentRows.length
         ? investmentRows.map((row) => `
           <tr>
@@ -1110,9 +1190,10 @@
             <td>${escapeHtml(row.action)}</td>
             <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
             <td>${row.quantity ? Number(row.quantity).toLocaleString() : ""}</td>
+            <td class="action-col">${trashButton("investment", row.id, `投資紀錄 ${row.stock_name || row.display_name || row.asset}`)}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="6" class="empty">這個月份尚無投資紀錄</td></tr>`;
+        : `<tr><td colspan="7" class="empty">這個月份尚無投資紀錄</td></tr>`;
       lastMonthlyTotals = summary.monthly_totals || [];
       drawMonthChart(lastMonthlyTotals);
     }
@@ -1133,6 +1214,12 @@
     document.getElementById("themeToggle").addEventListener("click", toggleTheme);
     document.getElementById("entryType").addEventListener("change", updateEntryType);
     document.getElementById("entryForm").addEventListener("submit", submitEntry);
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const button = target ? target.closest("[data-delete-target]") : null;
+      if (!button) return;
+      deleteRecord(button.dataset.deleteTarget, button.dataset.deleteId, button.dataset.deleteLabel);
+    });
     document.getElementById("monthInput").value = initialMonth;
     document.getElementById("expenseDate").value = currentDateText();
     document.getElementById("investmentDate").value = currentDateText();
