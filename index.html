@@ -599,6 +599,7 @@
       <div class="kpi"><div class="kpi-label">每日平均</div><div class="value" id="average">0 元</div><div class="kpi-sub">日常消費平均</div></div>
       <div class="kpi"><div class="kpi-label">最高單日</div><div class="value" id="maxDay">尚無</div><div class="kpi-sub">本月日常消費</div></div>
       <div class="kpi"><div class="kpi-label">年度淨額</div><div class="value" id="yearTotal">0 元</div><div class="kpi-sub">年度收入減日常消費</div></div>
+      <div class="kpi"><div class="kpi-label">距發薪日</div><div class="value" id="paydayCountdown">計算中</div><div class="kpi-sub" id="paydayDate">每月最後工作日</div></div>
     </div>
     <div class="two-col">
       <section class="section">
@@ -743,9 +744,44 @@
       const [year, month, day] = isoDate.split("-").map(Number);
       return `${year}/${month}/${day}`;
     }
+    function displayDateObject(date) {
+      return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+    }
     function displayMonth(monthText) {
       const normalized = monthText.replace("-", "");
       return `${Number(normalized.slice(0, 4))}/${Number(normalized.slice(4, 6))}`;
+    }
+    function lastBusinessDate(year, monthIndex) {
+      const date = new Date(year, monthIndex + 1, 0);
+      while (date.getDay() === 0 || date.getDay() === 6) {
+        date.setDate(date.getDate() - 1);
+      }
+      return date;
+    }
+    function startOfToday() {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    function updatePaydayCountdown(monthText) {
+      const normalized = monthText.replace("-", "");
+      const year = Number(normalized.slice(0, 4));
+      const month = Number(normalized.slice(4, 6));
+      const payday = lastBusinessDate(year, month - 1);
+      const today = startOfToday();
+      const days = Math.ceil((payday.getTime() - today.getTime()) / 86400000);
+      const valueEl = document.getElementById("paydayCountdown");
+      const dateEl = document.getElementById("paydayDate");
+      valueEl.classList.remove("positive", "negative");
+      dateEl.textContent = `發薪日 ${displayDateObject(payday)}`;
+      if (days > 0) {
+        valueEl.textContent = `${days} 天`;
+        valueEl.classList.add("positive");
+      } else if (days === 0) {
+        valueEl.textContent = "今天";
+        valueEl.classList.add("positive");
+      } else {
+        valueEl.textContent = "已發薪";
+      }
     }
     function money(value) {
       return `${Number(value || 0).toLocaleString()} 元`;
@@ -1109,6 +1145,7 @@
       setMoney("netTotal", summary.consumption_total ?? summary.cash_expense_total ?? 0, { negative: Number(summary.consumption_total ?? summary.cash_expense_total ?? 0) > 0 });
       setMoney("average", average);
       setMoney("yearTotal", summary.year_total || 0, { colorBySign: true });
+      updatePaydayCountdown(monthText);
       document.getElementById("maxDay").classList.remove("positive", "negative");
       if (maxDay) document.getElementById("maxDay").classList.add("negative");
       document.getElementById("maxDay").innerHTML = maxDay
