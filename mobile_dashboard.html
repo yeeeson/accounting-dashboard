@@ -372,6 +372,51 @@
       width: 100%;
       height: 260px;
     }
+    .checks-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .check-card {
+      border: 1px solid var(--rule);
+      border-radius: 9px;
+      padding: 12px 13px;
+      background: var(--surface-soft);
+    }
+    .check-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      color: var(--ink);
+      font-weight: 900;
+    }
+    .check-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--sage);
+      flex: 0 0 auto;
+    }
+    .check-card.warning .check-dot { background: var(--amber); }
+    .check-card.ok .check-dot { background: var(--sage); }
+    .check-card.info .check-dot { background: var(--sky); }
+    .check-detail { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .backup-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+      gap: 16px;
+      align-items: center;
+    }
+    .backup-note { color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .backup-actions {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .backup-status {
+      grid-column: 1 / -1;
+      color: var(--faint);
+      font-size: 12px;
+      min-height: 18px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -484,6 +529,9 @@
       .two-col { grid-template-columns: 1fr; }
       .entry-top { grid-template-columns: 1fr; }
       .entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .checks-grid,
+      .backup-panel { grid-template-columns: 1fr; }
+      .backup-actions { justify-content: flex-start; }
       h1 { font-size: 26px; }
       .kpi { padding: 16px 18px; }
       .value { font-size: 24px; }
@@ -631,6 +679,15 @@
     </section>
     <section class="section">
       <div class="section-head" onclick="toggleSection(this)">
+        <h2><span class="section-mark"></span>現金流瀑布圖</h2>
+        <span class="toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <canvas class="chart" id="cashflowChart"></canvas>
+      </div>
+    </section>
+    <section class="section">
+      <div class="section-head" onclick="toggleSection(this)">
         <h2><span class="section-mark"></span>每日明細</h2>
         <span class="toggle">▾</span>
       </div>
@@ -685,6 +742,31 @@
         </div>
       </div>
     </section>
+    <section class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <h2><span class="section-mark"></span>帳務檢查</h2>
+        <span class="toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <div id="accountingChecks" class="checks-grid"></div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <h2><span class="section-mark"></span>安全與備份</h2>
+        <span class="toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <div class="backup-panel">
+          <div class="backup-note">備份只使用目前已載入的 dashboard 資料，不會改 Supabase token、不會換 dashboard 連結，也不會把資料上傳到其他地方。</div>
+          <div class="backup-actions">
+            <button id="downloadJson" type="button">下載 JSON</button>
+            <button id="downloadCsv" type="button">下載 CSV</button>
+          </div>
+          <div id="backupStatus" class="backup-status"></div>
+        </div>
+      </div>
+    </section>
     <section class="section error" id="error" hidden></section>
   </main>
 
@@ -719,6 +801,8 @@
     const initialMonth = params.get("month") || currentMonth();
     const THEME_KEY = "accounting-dashboard-theme";
     let lastMonthlyTotals = [];
+    let lastCashflowSteps = [];
+    let lastPayload = null;
 
     function applyTheme(theme) {
       const safeTheme = theme === "dark" ? "dark" : "light";
@@ -726,6 +810,7 @@
       document.getElementById("themeToggle").textContent = safeTheme === "dark" ? "淺色" : "深色";
       localStorage.setItem(THEME_KEY, safeTheme);
       if (lastMonthlyTotals.length) drawMonthChart(lastMonthlyTotals);
+      if (lastCashflowSteps.length) drawCashflowChart(lastCashflowSteps);
     }
     function toggleTheme() {
       applyTheme(document.body.dataset.theme === "dark" ? "light" : "dark");
@@ -1085,7 +1170,162 @@
         ctx.fillText(valueLabel, centerX, isPositive ? barTop - 6 : barTop + barH + 6);
       });
     }
+    function drawCashflowChart(items) {
+      const canvas = document.getElementById("cashflowChart");
+      const { ctx, width, height } = resizeCanvas(canvas);
+      const css = getComputedStyle(document.body);
+      const increase = css.getPropertyValue("--increase").trim() || "#ba513a";
+      const deduction = css.getPropertyValue("--deduction").trim() || "#52735e";
+      const violet = css.getPropertyValue("--violet").trim() || "#7c5cc4";
+      const rule = css.getPropertyValue("--rule").trim() || "#ddd4c4";
+      const muted = css.getPropertyValue("--muted").trim() || "#716855";
+      const ink = css.getPropertyValue("--ink").trim() || "#282316";
+      ctx.clearRect(0, 0, width, height);
+      if (!items.length) {
+        ctx.fillStyle = muted;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.font = "14px Microsoft JhengHei, sans-serif";
+        ctx.fillText("尚無資料", width / 2, height / 2);
+        return;
+      }
+      const steps = items.map((item) => ({
+        ...item,
+        amount: Number(item.amount || 0),
+        running: Number(item.running || 0),
+      }));
+      const pad = { top: 24, right: 20, bottom: 58, left: 62 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+      const values = [0];
+      let previous = 0;
+      steps.forEach((step) => {
+        values.push(previous, step.running);
+        previous = step.running;
+      });
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const padding = Math.max((maxValue - minValue) * 0.14, 1000);
+      const min = minValue - padding;
+      const max = maxValue + padding;
+      const range = Math.max(max - min, 1);
+      const yFor = (value) => pad.top + chartH - ((value - min) / range) * chartH;
+      const slotW = chartW / steps.length;
+      const barW = Math.max(22, Math.min(68, slotW * 0.52));
+      const zeroY = yFor(0);
+
+      ctx.beginPath();
+      ctx.moveTo(pad.left, zeroY);
+      ctx.lineTo(width - pad.right, zeroY);
+      ctx.strokeStyle = rule;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = muted;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.font = "12px Microsoft JhengHei, sans-serif";
+      ctx.fillText("0", pad.left - 8, zeroY);
+
+      previous = 0;
+      steps.forEach((step, index) => {
+        const centerX = pad.left + slotW * index + slotW / 2;
+        const isTotal = step.kind === "total";
+        const base = isTotal ? 0 : previous;
+        const topValue = Math.max(base, step.running);
+        const bottomValue = Math.min(base, step.running);
+        const yTop = yFor(topValue);
+        const yBottom = yFor(bottomValue);
+        const h = Math.max(2, yBottom - yTop);
+        const x = centerX - barW / 2;
+        const color = isTotal ? violet : (step.amount >= 0 ? increase : deduction);
+        ctx.fillStyle = color;
+        if (typeof ctx.roundRect === "function") {
+          ctx.beginPath();
+          ctx.roundRect(x, yTop, barW, h, 6);
+          ctx.fill();
+        } else {
+          ctx.fillRect(x, yTop, barW, h);
+        }
+
+        if (!isTotal && index > 0) {
+          const prevX = pad.left + slotW * (index - 1) + slotW / 2 + barW / 2;
+          ctx.beginPath();
+          ctx.moveTo(prevX, yFor(base));
+          ctx.lineTo(x, yFor(base));
+          ctx.strokeStyle = rule;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        ctx.fillStyle = ink;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.font = "700 12px Microsoft JhengHei, sans-serif";
+        const prefix = isTotal ? "" : (step.amount >= 0 ? "+" : "-");
+        ctx.fillText(`${prefix}${shortMoney(Math.abs(isTotal ? step.running : step.amount))}`, centerX, yTop - 6);
+
+        ctx.fillStyle = muted;
+        ctx.textBaseline = "top";
+        ctx.font = "12px Microsoft JhengHei, sans-serif";
+        const label = String(step.label || "");
+        const labelLines = label.length > 4 ? [label.slice(0, 4), label.slice(4)] : [label];
+        labelLines.forEach((line, lineIndex) => {
+          ctx.fillText(line, centerX, pad.top + chartH + 12 + lineIndex * 15);
+        });
+        previous = step.running;
+      });
+    }
+    function renderAccountingChecks(checks) {
+      const items = Array.isArray(checks) ? checks : [];
+      document.getElementById("accountingChecks").innerHTML = items.length
+        ? items.map((item) => `
+          <div class="check-card ${escapeHtml(item.severity || "info")}">
+            <div class="check-title"><span class="check-dot"></span>${escapeHtml(item.title || "帳務檢查")}</div>
+            <div class="check-detail">${escapeHtml(item.detail || "")}</div>
+          </div>
+        `).join("")
+        : `<div class="empty">尚無檢查結果</div>`;
+    }
+    function downloadText(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+    function csvCell(value) {
+      const text = String(value ?? "");
+      return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+    }
+    function downloadBackupJson() {
+      if (!lastPayload) return;
+      const month = String(lastPayload.month || currentMonth()).replace("-", "");
+      downloadText(`accounting-${month}.json`, JSON.stringify(lastPayload, null, 2), "application/json;charset=utf-8");
+      document.getElementById("backupStatus").textContent = `已下載 ${month} JSON 備份。`;
+    }
+    function downloadBackupCsv() {
+      if (!lastPayload) return;
+      const categories = lastPayload.categories || DEFAULT_CATEGORIES;
+      const headers = ["日期", ...categories.map((category) => category.label), "合計", "備註"];
+      const rows = (lastPayload.rows || []).map((row) => [
+        displayDate(row.expense_date),
+        ...categories.map((category) => Number(row[category.key] || 0)),
+        categories.reduce((sum, category) => sum + Number(row[category.key] || 0), 0),
+        row.note || "",
+      ]);
+      const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+      const month = String(lastPayload.month || currentMonth()).replace("-", "");
+      downloadText(`accounting-expenses-${month}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
+      document.getElementById("backupStatus").textContent = `已下載 ${month} 日常消費 CSV。`;
+    }
     function render(payload) {
+      lastPayload = payload;
       const monthText = payload.month;
       const dataRows = payload.rows || [];
       const incomeRows = payload.incomes || [];
@@ -1223,7 +1463,10 @@
         `).join("")
         : `<tr><td colspan="7" class="empty">這個月份尚無投資紀錄</td></tr>`;
       lastMonthlyTotals = summary.monthly_totals || [];
+      lastCashflowSteps = summary.cashflow_steps || [];
       drawMonthChart(lastMonthlyTotals);
+      drawCashflowChart(lastCashflowSteps);
+      renderAccountingChecks(summary.accounting_checks || []);
     }
     function toggleNote(id, button) {
       const row = document.getElementById(id);
@@ -1240,6 +1483,8 @@
       loadDashboard(document.getElementById("monthInput").value.trim() || currentMonth());
     });
     document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+    document.getElementById("downloadJson").addEventListener("click", downloadBackupJson);
+    document.getElementById("downloadCsv").addEventListener("click", downloadBackupCsv);
     document.getElementById("entryType").addEventListener("change", updateEntryType);
     document.getElementById("entryForm").addEventListener("submit", submitEntry);
     document.addEventListener("click", (event) => {
@@ -1255,8 +1500,8 @@
     updateEntryType();
     loadDashboard(initialMonth);
     window.addEventListener("resize", () => {
-      const month = document.getElementById("monthInput").value.trim() || currentMonth();
-      loadDashboard(month);
+      if (lastMonthlyTotals.length) drawMonthChart(lastMonthlyTotals);
+      if (lastCashflowSteps.length) drawCashflowChart(lastCashflowSteps);
     });
   </script>
 </body>
