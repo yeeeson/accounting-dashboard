@@ -624,8 +624,8 @@
             <div class="entry-grid">
               <div class="entry-field"><label for="investmentDate">日期</label><input id="investmentDate" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
               <div class="entry-field"><label for="investmentAction">動作</label><select id="investmentAction"><option value="買入">買入</option><option value="賣出">賣出</option></select></div>
-              <div class="entry-field"><label for="investmentAsset">股票代碼</label><input id="investmentAsset" placeholder="例如 2454，可留空"></div>
-              <div class="entry-field"><label for="investmentStockName">股票名稱</label><input id="investmentStockName" placeholder="例如 聯發科，可留空"></div>
+              <div class="entry-field"><label for="investmentAsset">股票代碼</label><input id="investmentAsset" placeholder="例如 2454、NVDA，可留空"></div>
+              <div class="entry-field"><label for="investmentStockName">股票名稱</label><input id="investmentStockName" placeholder="例如 聯發科、輝達，可留空"></div>
               <div class="entry-field"><label for="investmentAmount">金額</label><input id="investmentAmount" inputmode="numeric" placeholder="15000"></div>
               <div class="entry-field"><label for="investmentQuantity">股數</label><input id="investmentQuantity" inputmode="decimal" placeholder="5"></div>
               <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
@@ -827,6 +827,11 @@
     function displayDate(isoDate) {
       const [year, month, day] = isoDate.split("-").map(Number);
       return `${year}/${month}/${day}`;
+    }
+    function displayDateWithWeekday(isoDate) {
+      const [year, month, day] = isoDate.split("-").map(Number);
+      const weekday = "日一二三四五六"[new Date(year, month - 1, day).getDay()];
+      return `${year}/${month}/${day}（${weekday}）`;
     }
     function displayDateObject(date) {
       return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
@@ -1419,7 +1424,7 @@
           const deleteButton = trashButton("expense", row.id, `${displayDate(row.expense_date)} 日常消費`);
           return `
           <tr>
-            <td class="date-col"><span class="date-cell"><span>${displayDate(row.expense_date)}</span>${noteButton}</span></td>
+            <td class="date-col"><span class="date-cell"><span>${displayDateWithWeekday(row.expense_date)}</span>${noteButton}</span></td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
             <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
             <td class="action-col">${deleteButton}</td>
