@@ -630,6 +630,7 @@
               <div class="entry-field"><label for="investmentAmount" id="investmentAmountLabel">金額（TWD）</label><input id="investmentAmount" inputmode="decimal" placeholder="15000"></div>
               <div class="entry-field"><label for="investmentQuantity">股數</label><input id="investmentQuantity" inputmode="decimal" placeholder="5"></div>
               <div class="entry-field"><label for="investmentExchangeRate">匯率</label><input id="investmentExchangeRate" inputmode="decimal" placeholder="1"></div>
+              <div class="entry-field"><label for="investmentPrice" id="investmentPriceLabel">成交均價</label><input id="investmentPrice" inputmode="decimal" placeholder="可留空"></div>
               <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
             </div>
           </div>
@@ -944,11 +945,17 @@
     }
     function updateInvestmentMarketFields() {
       const market = document.getElementById("investmentMarket").value;
+      const action = document.getElementById("investmentAction").value;
       const isUs = market === "US";
+      const isSell = String(action).includes("賣") || String(action).toLowerCase().includes("sell");
       const exchangeInput = document.getElementById("investmentExchangeRate");
-      document.getElementById("investmentAmountLabel").textContent = isUs ? "金額（USD）" : "金額（TWD）";
+      document.getElementById("investmentAmountLabel").textContent = isUs
+        ? (isSell ? "賣出毛額（USD）" : "台幣含費成本（TWD）")
+        : "金額（TWD）";
+      document.getElementById("investmentPriceLabel").textContent = isUs ? "成交均價（USD）" : "成交均價（TWD）";
       document.getElementById("investmentAsset").placeholder = isUs ? "例如 NVDA，可留空" : "例如 2454，可留空";
       document.getElementById("investmentStockName").placeholder = isUs ? "例如 NVIDIA、輝達，可留空" : "例如 聯發科，可留空";
+      document.getElementById("investmentAmount").placeholder = isUs ? (isSell ? "例如 123.45" : "例如 10000") : "15000";
       exchangeInput.disabled = !isUs;
       exchangeInput.value = isUs ? exchangeInput.value : "1";
       exchangeInput.placeholder = isUs ? "例如 31.5" : "1";
@@ -991,6 +998,7 @@
         amount: readValue("investmentAmount"),
         quantity: readValue("investmentQuantity"),
         exchange_rate: readValue("investmentExchangeRate"),
+        price: readValue("investmentPrice"),
         note: readValue("investmentNote"),
       };
     }
@@ -1508,6 +1516,7 @@
     document.getElementById("downloadJson").addEventListener("click", downloadBackupJson);
     document.getElementById("downloadCsv").addEventListener("click", downloadBackupCsv);
     document.getElementById("entryType").addEventListener("change", updateEntryType);
+    document.getElementById("investmentAction").addEventListener("change", updateInvestmentMarketFields);
     document.getElementById("investmentMarket").addEventListener("change", updateInvestmentMarketFields);
     document.getElementById("entryForm").addEventListener("submit", submitEntry);
     document.addEventListener("click", (event) => {
