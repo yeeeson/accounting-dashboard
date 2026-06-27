@@ -623,14 +623,16 @@
           <div class="entry-group" data-entry-group="investment" hidden>
             <div class="entry-grid">
               <div class="entry-field"><label for="investmentDate">日期</label><input id="investmentDate" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
-              <div class="entry-field"><label for="investmentAction">動作</label><select id="investmentAction"><option value="買入">買入</option><option value="賣出">賣出</option></select></div>
+              <div class="entry-field"><label for="investmentAction">動作</label><select id="investmentAction"><option value="buy">買入</option><option value="sell">賣出</option><option value="cash_dividend">配息</option><option value="stock_dividend">配股</option></select></div>
               <div class="entry-field"><label for="investmentMarket">市場</label><select id="investmentMarket"><option value="TW">台股</option><option value="US">美股</option></select></div>
+              <div class="entry-field"><label for="investmentCurrency">幣別</label><select id="investmentCurrency"><option value="TWD">TWD</option><option value="USD">USD</option></select></div>
               <div class="entry-field"><label for="investmentAsset">股票代碼</label><input id="investmentAsset" placeholder="例如 2454、NVDA，可留空"></div>
               <div class="entry-field"><label for="investmentStockName">股票名稱</label><input id="investmentStockName" placeholder="例如 聯發科、輝達，可留空"></div>
-              <div class="entry-field"><label for="investmentAmount" id="investmentAmountLabel">金額（TWD）</label><input id="investmentAmount" inputmode="decimal" placeholder="15000"></div>
-              <div class="entry-field"><label for="investmentQuantity">股數</label><input id="investmentQuantity" inputmode="decimal" placeholder="5"></div>
-              <div class="entry-field"><label for="investmentExchangeRate">匯率</label><input id="investmentExchangeRate" inputmode="decimal" placeholder="1"></div>
-              <div class="entry-field"><label for="investmentPrice" id="investmentPriceLabel">成交均價</label><input id="investmentPrice" inputmode="decimal" placeholder="可留空"></div>
+              <div class="entry-field" id="investmentAmountField"><label for="investmentAmount" id="investmentAmountLabel">金額（TWD）</label><input id="investmentAmount" inputmode="decimal" placeholder="15000"></div>
+              <div class="entry-field" id="investmentOriginalAmountField" hidden><label for="investmentOriginalAmount" id="investmentOriginalAmountLabel">原幣金額</label><input id="investmentOriginalAmount" inputmode="decimal" placeholder="可留空"></div>
+              <div class="entry-field" id="investmentQuantityField"><label for="investmentQuantity" id="investmentQuantityLabel">股數</label><input id="investmentQuantity" inputmode="decimal" placeholder="5"></div>
+              <div class="entry-field" id="investmentExchangeRateField"><label for="investmentExchangeRate">匯率</label><input id="investmentExchangeRate" inputmode="decimal" placeholder="1"></div>
+              <div class="entry-field" id="investmentPriceField"><label for="investmentPrice" id="investmentPriceLabel">成交均價</label><input id="investmentPrice" inputmode="decimal" placeholder="可留空"></div>
               <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
             </div>
           </div>
@@ -739,7 +741,7 @@
       <div class="section-body" style="padding: 0;">
         <div class="table-wrap">
           <table>
-          <thead><tr><th>日期</th><th>市場</th><th>標的</th><th>股票名稱</th><th>動作</th><th>金額 TWD</th><th>原始金額</th><th>股數</th><th class="action-col">操作</th></tr></thead>
+          <thead><tr><th>日期</th><th>市場</th><th>幣別</th><th>動作</th><th>代號</th><th>名稱</th><th>TWD 金額</th><th>原幣金額</th><th>匯率</th><th>股數</th><th>均價</th><th class="action-col">操作</th></tr></thead>
             <tbody id="investmentRows"></tbody>
           </table>
         </div>
@@ -902,8 +904,55 @@
       `;
     }
     function isSellAction(action) {
+      return normalizeInvestmentAction(action) === "sell";
+    }
+    function isBuyAction(action) {
+      return normalizeInvestmentAction(action) === "buy";
+    }
+    function isCashDividendAction(action) {
+      return normalizeInvestmentAction(action) === "cash_dividend";
+    }
+    function isStockDividendAction(action) {
+      return normalizeInvestmentAction(action) === "stock_dividend";
+    }
+    function normalizeInvestmentAction(action) {
       const text = String(action ?? "").trim().toLowerCase();
-      return text.includes("賣") || text.includes("sell") || text.includes("sold");
+      if (!text) return "buy";
+      if (text === "buy" || text.includes("買")) return "buy";
+      if (text === "sell" || text === "sold" || text.includes("賣")) return "sell";
+      if (text === "cash_dividend" || text === "dividend" || text.includes("配息") || text.includes("股息")) return "cash_dividend";
+      if (text === "stock_dividend" || text.includes("配股")) return "stock_dividend";
+      return text;
+    }
+    function investmentActionLabel(action) {
+      return {
+        buy: "買入",
+        sell: "賣出",
+        cash_dividend: "配息",
+        stock_dividend: "配股",
+      }[normalizeInvestmentAction(action)] || String(action || "");
+    }
+    function investmentKindLabel(row) {
+      const action = normalizeInvestmentAction(row.action);
+      if (action === "cash_dividend") return "現金股利";
+      if (action === "stock_dividend") return "配發股數";
+      return investmentActionLabel(action);
+    }
+    function formatMaybeNumber(value, suffix = "") {
+      if (value === null || value === undefined || value === "") return "";
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "";
+      return `${number.toLocaleString()}${suffix}`;
+    }
+    function formatOriginalAmount(row) {
+      const currency = row.currency || (row.market === "US" ? "USD" : "TWD");
+      const amount = row.amount_original ?? row.amount;
+      return formatMaybeNumber(amount, ` ${currency}`);
+    }
+    function formatTwdAmount(row) {
+      const action = normalizeInvestmentAction(row.action);
+      if (action === "stock_dividend") return "0";
+      return formatMaybeNumber(row.amount);
     }
     function reportValue(row, key) {
       if (key === "investment") return Number(row.investment || 0);
@@ -938,7 +987,7 @@
       const format = {
         expense: "日期 20260606，金額填在對應分類",
         fixed: "名稱、金額、扣款日，例如 房租 12000 5",
-        investment: "市場、日期、買入/賣出、股票代碼或名稱、股數、金額、匯率",
+        investment: "市場、日期、動作、股票代碼或名稱、金額或股數",
       }[type] || "";
       document.getElementById("entryFormat").value = format;
       setEntryStatus("");
@@ -947,15 +996,35 @@
       const market = document.getElementById("investmentMarket").value;
       const action = document.getElementById("investmentAction").value;
       const isUs = market === "US";
-      const isSell = String(action).includes("賣") || String(action).toLowerCase().includes("sell");
+      const isSell = isSellAction(action);
+      const isCashDividend = isCashDividendAction(action);
+      const isStockDividend = isStockDividendAction(action);
       const exchangeInput = document.getElementById("investmentExchangeRate");
+      const currencyInput = document.getElementById("investmentCurrency");
+      const amountField = document.getElementById("investmentAmountField");
+      const originalAmountField = document.getElementById("investmentOriginalAmountField");
+      const quantityField = document.getElementById("investmentQuantityField");
+      const exchangeRateField = document.getElementById("investmentExchangeRateField");
+      const priceField = document.getElementById("investmentPriceField");
+      currencyInput.value = isUs ? "USD" : "TWD";
+      amountField.hidden = isStockDividend || (isUs && isSell);
+      originalAmountField.hidden = !isUs || isBuyAction(action) || isStockDividend;
+      quantityField.hidden = isCashDividend;
+      priceField.hidden = isCashDividend || isStockDividend;
+      exchangeRateField.hidden = !isUs;
       document.getElementById("investmentAmountLabel").textContent = isUs
-        ? (isSell ? "賣出毛額（USD）" : "台幣含費成本（TWD）")
-        : "金額（TWD）";
+        ? (isCashDividend ? "台幣入帳金額（可留空）" : isSell ? "台幣換算金額（自動，可留空）" : "台幣含費成本（TWD）")
+        : (isCashDividend ? "實收現金股利（TWD）" : "金額（TWD）");
+      document.getElementById("investmentOriginalAmountLabel").textContent = isCashDividend ? "現金股利（USD）" : "賣出毛額（USD）";
       document.getElementById("investmentPriceLabel").textContent = isUs ? "成交均價（USD）" : "成交均價（TWD）";
+      document.getElementById("investmentQuantityLabel").textContent = isStockDividend ? "配發股數" : "股數";
       document.getElementById("investmentAsset").placeholder = isUs ? "例如 NVDA，可留空" : "例如 2454，可留空";
       document.getElementById("investmentStockName").placeholder = isUs ? "例如 NVIDIA、輝達，可留空" : "例如 聯發科，可留空";
-      document.getElementById("investmentAmount").placeholder = isUs ? (isSell ? "例如 123.45" : "例如 10000") : "15000";
+      document.getElementById("investmentAmount").placeholder = isUs
+        ? (isCashDividend || isSell ? "可留空" : "例如 10000")
+        : (isCashDividend ? "例如 888" : "15000");
+      document.getElementById("investmentOriginalAmount").placeholder = isCashDividend ? "例如 12.34" : "例如 123.45";
+      document.getElementById("investmentQuantity").placeholder = isStockDividend ? "例如 20" : "5";
       exchangeInput.disabled = !isUs;
       exchangeInput.value = isUs ? exchangeInput.value : "1";
       exchangeInput.placeholder = isUs ? "例如 31.5" : "1";
@@ -988,14 +1057,19 @@
           note: readValue("fixedNote"),
         };
       }
+      const investmentAction = readValue("investmentAction");
+      const investmentMarket = readValue("investmentMarket");
+      const normalizedAction = normalizeInvestmentAction(investmentAction);
       return {
         type,
         date: readValue("investmentDate"),
-        action: readValue("investmentAction"),
-        market: readValue("investmentMarket"),
+        action: investmentAction,
+        market: investmentMarket,
+        currency: readValue("investmentCurrency"),
         asset: readValue("investmentAsset"),
         stock_name: readValue("investmentStockName"),
-        amount: readValue("investmentAmount"),
+        amount: investmentMarket === "US" && normalizedAction === "sell" ? "" : readValue("investmentAmount"),
+        amount_original: readValue("investmentOriginalAmount"),
         quantity: readValue("investmentQuantity"),
         exchange_rate: readValue("investmentExchangeRate"),
         price: readValue("investmentPrice"),
@@ -1482,16 +1556,19 @@
           <tr>
             <td>${displayDate(row.record_date)}</td>
             <td>${escapeHtml(row.market === "US" ? "美股" : "台股")}</td>
+            <td>${escapeHtml(row.currency || (row.market === "US" ? "USD" : "TWD"))}</td>
+            <td>${escapeHtml(investmentKindLabel(row))}</td>
             <td>${escapeHtml(row.asset)}</td>
             <td>${escapeHtml(row.stock_name || row.display_name || "")}</td>
-            <td>${escapeHtml(row.action)}</td>
-            <td><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
-            <td>${row.currency === "USD" ? `${Number(row.amount_original || 0).toLocaleString()} USD / ${Number(row.exchange_rate || 0).toLocaleString()}` : `${Number(row.amount_original || row.amount || 0).toLocaleString()} TWD`}</td>
-            <td>${row.quantity ? Number(row.quantity).toLocaleString() : ""}</td>
+            <td><strong>${formatTwdAmount(row)}</strong></td>
+            <td>${formatOriginalAmount(row)}</td>
+            <td>${formatMaybeNumber(row.exchange_rate)}</td>
+            <td>${formatMaybeNumber(row.quantity)}</td>
+            <td>${formatMaybeNumber(row.price)}</td>
             <td class="action-col">${trashButton("investment", row.id, `投資紀錄 ${row.stock_name || row.display_name || row.asset}`)}</td>
           </tr>
         `).join("")
-        : `<tr><td colspan="9" class="empty">這個月份尚無投資紀錄</td></tr>`;
+        : `<tr><td colspan="12" class="empty">這個月份尚無投資紀錄</td></tr>`;
       lastMonthlyTotals = summary.monthly_totals || [];
       lastCashflowSteps = summary.cashflow_steps || [];
       drawMonthChart(lastMonthlyTotals);
