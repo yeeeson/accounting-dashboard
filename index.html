@@ -186,6 +186,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
       margin-top: 14px;
     }
     .entry-status {
@@ -194,6 +195,11 @@
       white-space: pre-wrap;
     }
     .entry-status.is-error { color: var(--rust); }
+    .entry-edit-context {
+      color: var(--leaf);
+      font-size: 13px;
+      font-weight: 800;
+    }
     [hidden] { display: none !important; }
     .kpis {
       display: grid;
@@ -372,7 +378,17 @@
       width: 100%;
       height: 260px;
     }
-    .checks-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .checks-grid,
+    .summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .summary-card {
+      border: 1px solid var(--rule);
+      border-radius: 9px;
+      padding: 12px 13px;
+      background: var(--surface-soft);
+    }
+    .summary-card .label { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .summary-card .value { font-size: 22px; font-weight: 900; line-height: 1.2; overflow-wrap: anywhere; }
+    .summary-card .detail { color: var(--faint); font-size: 12px; margin-top: 6px; line-height: 1.5; }
     .check-card {
       border: 1px solid var(--rule);
       border-radius: 9px;
@@ -488,7 +504,8 @@
       width: 48px;
       text-align: center;
     }
-    .delete-btn {
+    .delete-btn,
+    .edit-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -501,11 +518,17 @@
       color: var(--muted);
       box-shadow: none;
     }
+    .edit-btn { color: var(--leaf); margin-right: 4px; }
     .delete-btn:hover {
       background: var(--surface-soft);
       color: var(--deduction);
     }
-    .delete-btn svg {
+    .edit-btn:hover {
+      background: var(--surface-soft);
+      color: var(--leaf);
+    }
+    .delete-btn svg,
+    .edit-btn svg {
       width: 15px;
       height: 15px;
       stroke: currentColor;
@@ -530,6 +553,7 @@
       .entry-top { grid-template-columns: 1fr; }
       .entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .checks-grid,
+      .summary-grid,
       .backup-panel { grid-template-columns: 1fr; }
       .backup-actions { justify-content: flex-start; }
       h1 { font-size: 26px; }
@@ -587,6 +611,7 @@
               <label for="entryType">記帳類型</label>
               <select id="entryType" name="type">
                 <option value="expense">日常消費</option>
+                <option value="income">收入</option>
                 <option value="fixed">固定支出</option>
                 <option value="investment">投資紀錄</option>
               </select>
@@ -609,6 +634,14 @@
               <div class="entry-field"><label for="expenseSport">運動</label><input id="expenseSport" data-expense-key="sport" inputmode="numeric" placeholder="0"></div>
               <div class="entry-field"><label for="expenseOthers">其他</label><input id="expenseOthers" data-expense-key="others" inputmode="numeric" placeholder="0"></div>
               <div class="entry-field wide"><label for="expenseNote">備註</label><input id="expenseNote" placeholder="例如 游泳、停車費"></div>
+            </div>
+          </div>
+          <div class="entry-group" data-entry-group="income" hidden>
+            <div class="entry-grid">
+              <div class="entry-field"><label for="incomeDate">日期</label><input id="incomeDate" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
+              <div class="entry-field"><label for="incomeSource">來源</label><input id="incomeSource" placeholder="例如 薪水、獎金"></div>
+              <div class="entry-field"><label for="incomeAmount">金額</label><input id="incomeAmount" inputmode="numeric" placeholder="50000"></div>
+              <div class="entry-field wide"><label for="incomeNote">備註</label><input id="incomeNote" placeholder="可留空"></div>
             </div>
           </div>
           <div class="entry-group" data-entry-group="fixed" hidden>
@@ -638,6 +671,8 @@
           </div>
           <div class="entry-actions">
             <button type="submit">儲存</button>
+            <button id="cancelEdit" type="button" hidden>取消編輯</button>
+            <span id="entryEditContext" class="entry-edit-context"></span>
             <span id="entryStatus" class="entry-status"></span>
           </div>
         </form>
@@ -691,6 +726,26 @@
         <canvas class="chart" id="cashflowChart"></canvas>
       </div>
     </section>
+    <div class="two-col">
+      <section class="section">
+        <div class="section-head" onclick="toggleSection(this)">
+          <h2><span class="section-mark"></span>現金流預測</h2>
+          <span class="toggle">▾</span>
+        </div>
+        <div class="section-body">
+          <div id="cashflowForecast" class="summary-grid"></div>
+        </div>
+      </section>
+      <section class="section">
+        <div class="section-head" onclick="toggleSection(this)">
+          <h2><span class="section-mark"></span>投資現金流與股利</h2>
+          <span class="toggle">▾</span>
+        </div>
+        <div class="section-body">
+          <div id="investmentCashflow" class="summary-grid"></div>
+        </div>
+      </section>
+    </div>
     <section class="section">
       <div class="section-head" onclick="toggleSection(this)">
         <h2><span class="section-mark"></span>每日明細</h2>
@@ -766,7 +821,9 @@
           <div class="backup-note">備份只使用目前已載入的 dashboard 資料，不會改 Supabase token、不會換 dashboard 連結，也不會把資料上傳到其他地方。</div>
           <div class="backup-actions">
             <button id="downloadJson" type="button">下載 JSON</button>
-            <button id="downloadCsv" type="button">下載 CSV</button>
+            <button id="downloadCsv" type="button">下載日常 CSV</button>
+            <button id="downloadWorkbookCsv" type="button">下載完整 CSV</button>
+            <button id="downloadSummaryCsv" type="button">下載月比較 CSV</button>
           </div>
           <div id="backupStatus" class="backup-status"></div>
         </div>
@@ -808,6 +865,7 @@
     let lastMonthlyTotals = [];
     let lastCashflowSteps = [];
     let lastPayload = null;
+    let editState = null;
 
     function applyTheme(theme) {
       const safeTheme = theme === "dark" ? "dark" : "light";
@@ -832,6 +890,11 @@
     function displayDate(isoDate) {
       const [year, month, day] = isoDate.split("-").map(Number);
       return `${year}/${month}/${day}`;
+    }
+    function inputDate(isoDate) {
+      if (!isoDate) return currentDateText();
+      const [year, month, day] = String(isoDate).split("-").map(Number);
+      return `${year}${String(month).padStart(2, "0")}${String(day).padStart(2, "0")}`;
     }
     function displayDateWithWeekday(isoDate) {
       const [year, month, day] = isoDate.split("-").map(Number);
@@ -899,6 +962,17 @@
             <path d="M6 6l1 15h10l1-15"></path>
             <path d="M10 11v6"></path>
             <path d="M14 11v6"></path>
+          </svg>
+        </button>
+      `;
+    }
+    function editButton(target, id, label) {
+      if (!id) return "";
+      return `
+        <button class="edit-btn" type="button" data-edit-target="${escapeHtml(target)}" data-edit-id="${escapeHtml(id)}" data-edit-label="${escapeHtml(label)}" aria-label="編輯${escapeHtml(label)}">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4z"></path>
+            <path d="M13 6l5 5"></path>
           </svg>
         </button>
       `;
@@ -979,6 +1053,11 @@
       el.textContent = message || "";
       el.classList.toggle("is-error", Boolean(isError));
     }
+    function setEditState(state) {
+      editState = state;
+      document.getElementById("cancelEdit").hidden = !state;
+      document.getElementById("entryEditContext").textContent = state ? `編輯中：${state.label}` : "";
+    }
     function updateEntryType() {
       const type = document.getElementById("entryType").value;
       document.querySelectorAll("[data-entry-group]").forEach((group) => {
@@ -986,6 +1065,7 @@
       });
       const format = {
         expense: "日期 20260606，金額填在對應分類",
+        income: "日期、來源、金額，例如 薪水 50000",
         fixed: "名稱、金額、扣款日，例如 房租 12000 5",
         investment: "市場、日期、動作、股票代碼或名稱、金額或股數",
       }[type] || "";
@@ -1057,6 +1137,15 @@
           note: readValue("fixedNote"),
         };
       }
+      if (type === "income") {
+        return {
+          type,
+          date: readValue("incomeDate"),
+          source: readValue("incomeSource"),
+          amount: readValue("incomeAmount"),
+          note: readValue("incomeNote"),
+        };
+      }
       const investmentAction = readValue("investmentAction");
       const investmentMarket = readValue("investmentMarket");
       const normalizedAction = normalizeInvestmentAction(investmentAction);
@@ -1076,6 +1165,17 @@
         note: readValue("investmentNote"),
       };
     }
+    function buildSubmitPayload() {
+      const payload = buildEntryPayload();
+      if (!editState) return payload;
+      return {
+        ...payload,
+        type: "update",
+        target: editState.target,
+        id: editState.id,
+        month: document.getElementById("monthInput").value.trim() || currentMonth(),
+      };
+    }
     async function submitEntry(event) {
       event.preventDefault();
       setEntryStatus("儲存中");
@@ -1083,7 +1183,7 @@
         const response = await fetch(apiPostUrl(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(buildEntryPayload()),
+          body: JSON.stringify(buildSubmitPayload()),
         });
         const text = await response.text();
         let payload;
@@ -1094,6 +1194,7 @@
         }
         if (!response.ok || !payload.ok) throw new Error(payload.error || text);
         setEntryStatus(payload.message || "已儲存");
+        setEditState(null);
         if (payload.month) {
           await loadDashboard(String(payload.month).replace("-", ""));
         } else {
@@ -1128,6 +1229,80 @@
       } catch (error) {
         setEntryStatus(error instanceof Error ? error.message : String(error), true);
       }
+    }
+    function setValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value ?? "";
+    }
+    function clearEntryForm() {
+      document.getElementById("entryForm").reset();
+      setValue("expenseDate", currentDateText());
+      setValue("incomeDate", currentDateText());
+      setValue("investmentDate", currentDateText());
+      setValue("investmentExchangeRate", "1");
+      setEditState(null);
+      updateEntryType();
+      updateInvestmentMarketFields();
+      setEntryStatus("");
+    }
+    function expenseInputId(key) {
+      return `expense${key.split("_").map((part) => part[0].toUpperCase() + part.slice(1)).join("")}`;
+    }
+    function findRecord(target, id) {
+      if (!lastPayload) return null;
+      if (target === "expense") return (lastPayload.rows || []).find((row) => row.id === id);
+      if (target === "income") return (lastPayload.incomes || []).find((row) => row.id === id);
+      if (target === "fixed") return (lastPayload.fixed_expenses || []).find((row) => row.id === id);
+      if (target === "investment") return (lastPayload.investment_records || []).find((row) => row.id === id);
+      return null;
+    }
+    function editRecord(target, id, label) {
+      const row = findRecord(target, id);
+      if (!row) {
+        setEntryStatus("找不到要編輯的資料，請重新整理。", true);
+        return;
+      }
+      clearEntryForm();
+      setEditState({ target, id, label });
+      if (target === "expense") {
+        setValue("entryType", "expense");
+        updateEntryType();
+        setValue("expenseDate", inputDate(row.expense_date));
+        DEFAULT_CATEGORIES.forEach((category) => setValue(expenseInputId(category.key), row[category.key] || ""));
+        setValue("expenseNote", row.note || "");
+      } else if (target === "income") {
+        setValue("entryType", "income");
+        updateEntryType();
+        setValue("incomeDate", inputDate(row.income_date));
+        setValue("incomeSource", row.source || "");
+        setValue("incomeAmount", row.amount || "");
+        setValue("incomeNote", row.note || "");
+      } else if (target === "fixed") {
+        setValue("entryType", "fixed");
+        updateEntryType();
+        setValue("fixedName", row.name || "");
+        setValue("fixedAmount", row.amount || "");
+        setValue("fixedDueDay", row.due_day || "");
+        setValue("fixedCategory", row.category || "");
+        setValue("fixedNote", row.note || "");
+      } else if (target === "investment") {
+        setValue("entryType", "investment");
+        updateEntryType();
+        setValue("investmentDate", inputDate(row.record_date));
+        setValue("investmentAction", normalizeInvestmentAction(row.action));
+        setValue("investmentMarket", row.market || "TW");
+        setValue("investmentCurrency", row.currency || (row.market === "US" ? "USD" : "TWD"));
+        setValue("investmentAsset", row.asset || "");
+        setValue("investmentStockName", row.stock_name || row.display_name || "");
+        setValue("investmentAmount", row.market === "US" && isSellAction(row.action) ? "" : row.amount || "");
+        setValue("investmentOriginalAmount", row.amount_original || "");
+        setValue("investmentQuantity", row.quantity || "");
+        setValue("investmentExchangeRate", row.exchange_rate || (row.market === "US" ? "" : "1"));
+        setValue("investmentPrice", row.price || "");
+        setValue("investmentNote", row.note || "");
+        updateInvestmentMarketFields();
+      }
+      document.querySelector(".entry-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     async function loadDashboard(month) {
       setError("");
@@ -1390,6 +1565,36 @@
         `).join("")
         : `<div class="empty">尚無檢查結果</div>`;
     }
+    function summaryCard(label, value, detail = "", className = "") {
+      return `
+        <div class="summary-card ${className}">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${escapeHtml(value)}</div>
+          ${detail ? `<div class="detail">${escapeHtml(detail)}</div>` : ""}
+        </div>
+      `;
+    }
+    function renderCashflowForecast(forecast) {
+      const data = forecast || {};
+      const upcoming = (data.upcoming_fixed_expenses || [])
+        .map((row) => `${row.due_day} 日 ${row.name} ${money(row.amount)}`)
+        .join("、");
+      document.getElementById("cashflowForecast").innerHTML = [
+        summaryCard("距預測基準日", `${Number(data.days_remaining || 0)} 天`, data.anchor_date ? `基準日 ${displayDate(data.anchor_date)}` : ""),
+        summaryCard("預估日常花費", money(data.projected_daily_spend || 0), `每日平均 ${money(data.average_daily_spend || 0)}`, "amount-neg"),
+        summaryCard("待扣固定支出", money(data.upcoming_fixed_expense_total || 0), upcoming || "本月發薪日前沒有待扣項目", "amount-neg"),
+        summaryCard("預估月底餘額", money(data.projected_month_end_balance || 0), "月合計扣除預估日常與待扣固定支出", Number(data.projected_month_end_balance || 0) >= 0 ? "amount-pos" : "amount-neg"),
+      ].join("");
+    }
+    function renderInvestmentCashflow(summary) {
+      const data = summary || {};
+      document.getElementById("investmentCashflow").innerHTML = [
+        summaryCard("買入", money(data.buy_total || 0), `${Number(data.buy_count || 0)} 筆`, "amount-neg"),
+        summaryCard("賣出", money(data.sell_total || 0), `${Number(data.sell_count || 0)} 筆`, "amount-pos"),
+        summaryCard("現金股利", money(data.cash_dividend_total || 0), `USD 原幣 ${Number(data.us_cash_dividend_original || 0).toLocaleString()}，${Number(data.cash_dividend_count || 0)} 筆`, "amount-pos"),
+        summaryCard("配股", `${Number(data.stock_dividend_quantity || 0).toLocaleString()} 股`, `${Number(data.stock_dividend_count || 0)} 筆`),
+      ].join("");
+    }
     function downloadText(filename, content, type) {
       const blob = new Blob([content], { type });
       const url = URL.createObjectURL(blob);
@@ -1425,6 +1630,94 @@
       const month = String(lastPayload.month || currentMonth()).replace("-", "");
       downloadText(`accounting-expenses-${month}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
       document.getElementById("backupStatus").textContent = `已下載 ${month} 日常消費 CSV。`;
+    }
+    function downloadWorkbookCsv() {
+      if (!lastPayload) return;
+      const categories = lastPayload.categories || DEFAULT_CATEGORIES;
+      const headers = [
+        "record_type", "date", "name", "category", "action", "market", "currency",
+        "amount_twd", "amount_original", "exchange_rate", "quantity", "price",
+        ...categories.map((category) => `expense_${category.key}`),
+        "note", "id",
+      ];
+      const rows = [];
+      (lastPayload.rows || []).forEach((row) => {
+        rows.push([
+          "expense",
+          row.expense_date,
+          "",
+          "",
+          "",
+          "",
+          "TWD",
+          categories.reduce((sum, category) => sum + Number(row[category.key] || 0), 0),
+          "",
+          "",
+          "",
+          "",
+          ...categories.map((category) => Number(row[category.key] || 0)),
+          row.note || "",
+          row.id || "",
+        ]);
+      });
+      (lastPayload.incomes || []).forEach((row) => {
+        rows.push(["income", row.income_date, row.source || "", "", "", "", "TWD", Number(row.amount || 0), "", "", "", "", ...categories.map(() => ""), row.note || "", row.id || ""]);
+      });
+      (lastPayload.fixed_expenses || []).forEach((row) => {
+        rows.push(["fixed_expense", "", row.name || "", row.category || "", "", "", "TWD", Number(row.amount || 0), "", "", "", "", ...categories.map(() => ""), row.note || "", row.id || ""]);
+      });
+      (lastPayload.investment_records || []).forEach((row) => {
+        rows.push([
+          "investment",
+          row.record_date,
+          row.stock_name || row.display_name || row.asset || "",
+          "",
+          normalizeInvestmentAction(row.action),
+          row.market || "",
+          row.currency || "",
+          Number(row.amount || 0),
+          row.amount_original ?? "",
+          row.exchange_rate ?? "",
+          row.quantity ?? "",
+          row.price ?? "",
+          ...categories.map(() => ""),
+          row.note || "",
+          row.id || "",
+        ]);
+      });
+      rows.sort((a, b) => String(a[1]).localeCompare(String(b[1])) || String(a[0]).localeCompare(String(b[0])));
+      const csv = [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+      const month = String(lastPayload.month || currentMonth()).replace("-", "");
+      downloadText(`accounting-ledger-${month}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
+      document.getElementById("backupStatus").textContent = `已下載 ${month} 完整長表 CSV。`;
+    }
+    function downloadSummaryCsv() {
+      if (!lastPayload) return;
+      const headers = [
+        "month", "net_total", "income_total", "cash_expense_total", "fixed_expense_total",
+        "investment_buy_total", "investment_sell_total", "cash_dividend_total",
+        "projected_month_end_balance", "daily_average",
+      ];
+      const summary = lastPayload.summary || {};
+      const forecast = summary.cashflow_forecast || {};
+      const investment = summary.investment_cashflow || {};
+      const rows = [[
+        lastPayload.month || "",
+        summary.month_total ?? "",
+        summary.income_total ?? "",
+        summary.cash_expense_total ?? "",
+        summary.fixed_expense_total ?? "",
+        summary.investment_buy_total ?? "",
+        summary.investment_sell_total ?? "",
+        investment.cash_dividend_total ?? "",
+        forecast.projected_month_end_balance ?? "",
+        summary.daily_average ?? "",
+      ]];
+      const monthly = (summary.monthly_totals || []).map((row) => [row.month, row.total, "", "", "", "", "", "", "", ""]);
+      const csv = [headers, ...rows, ...monthly].map((row) => row.map(csvCell).join(",")).join("\n");
+      const month = String(lastPayload.month || currentMonth()).replace("-", "");
+      downloadText(`accounting-summary-${month}.csv`, `\uFEFF${csv}`, "text/csv;charset=utf-8");
+      document.getElementById("backupStatus").textContent = `已下載 ${month} 月比較 CSV。`;
     }
     function render(payload) {
       lastPayload = payload;
@@ -1518,13 +1811,14 @@
         ? dataRows.map((row, index) => {
           const noteId = `note-${index}`;
           const noteButton = row.note ? `<button class="note-btn" type="button" aria-label="備註" aria-expanded="false" aria-controls="${noteId}" onclick="toggleNote('${noteId}', this)">i</button>` : "";
-          const deleteButton = trashButton("expense", row.id, `${displayDate(row.expense_date)} 日常消費`);
+          const label = `${displayDate(row.expense_date)} 日常消費`;
+          const actionButtons = `${editButton("expense", row.id, label)}${trashButton("expense", row.id, label)}`;
           return `
           <tr>
             <td class="date-col"><span class="date-cell"><span>${displayDateWithWeekday(row.expense_date)}</span>${noteButton}</span></td>
             ${expenseCategories.map((category) => `<td>${Number(row[category.key] || 0).toLocaleString()}</td>`).join("")}
             <td><strong>${visibleTotal(row).toLocaleString()}</strong></td>
-            <td class="action-col">${deleteButton}</td>
+            <td class="action-col">${actionButtons}</td>
           </tr>
           ${row.note ? `<tr class="note-row" id="${noteId}" hidden><td class="note-cell" colspan="${expenseCategories.length + 3}"><div class="note-panel">${escapeHtml(row.note)}</div></td></tr>` : ""}
         `;
@@ -1536,7 +1830,7 @@
             <td>${displayDate(row.date)}</td>
             <td>${escapeHtml(row.source)}</td>
             <td class="amount-pos"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
-            <td class="action-col">${trashButton(row.target, row.id, row.deleteLabel)}</td>
+            <td class="action-col">${row.target === "income" ? editButton("income", row.id, row.deleteLabel) : editButton("investment", row.id, row.deleteLabel)}${trashButton(row.target, row.id, row.deleteLabel)}</td>
           </tr>
         `).join("")
         : `<tr><td colspan="4" class="empty">這個月份尚無收入</td></tr>`;
@@ -1547,7 +1841,7 @@
             <td>${escapeHtml(row.name)}</td>
             <td>${row.due_day ? `${Number(row.due_day)} 日` : ""}</td>
             <td class="amount-neg"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
-            <td class="action-col">${trashButton("fixed", row.id, `固定支出 ${row.name}`)}</td>
+            <td class="action-col">${editButton("fixed", row.id, `固定支出 ${row.name}`)}${trashButton("fixed", row.id, `固定支出 ${row.name}`)}</td>
           </tr>
         `).join("")
         : `<tr><td colspan="4" class="empty">本月沒有固定支出</td></tr>`;
@@ -1565,7 +1859,7 @@
             <td>${formatMaybeNumber(row.exchange_rate)}</td>
             <td>${formatMaybeNumber(row.quantity)}</td>
             <td>${formatMaybeNumber(row.price)}</td>
-            <td class="action-col">${trashButton("investment", row.id, `投資紀錄 ${row.stock_name || row.display_name || row.asset}`)}</td>
+            <td class="action-col">${editButton("investment", row.id, `投資紀錄 ${row.stock_name || row.display_name || row.asset}`)}${trashButton("investment", row.id, `投資紀錄 ${row.stock_name || row.display_name || row.asset}`)}</td>
           </tr>
         `).join("")
         : `<tr><td colspan="12" class="empty">這個月份尚無投資紀錄</td></tr>`;
@@ -1573,6 +1867,8 @@
       lastCashflowSteps = summary.cashflow_steps || [];
       drawMonthChart(lastMonthlyTotals);
       drawCashflowChart(lastCashflowSteps);
+      renderCashflowForecast(summary.cashflow_forecast || {});
+      renderInvestmentCashflow(summary.investment_cashflow || {});
       renderAccountingChecks(summary.accounting_checks || []);
     }
     function toggleNote(id, button) {
@@ -1592,18 +1888,28 @@
     document.getElementById("themeToggle").addEventListener("click", toggleTheme);
     document.getElementById("downloadJson").addEventListener("click", downloadBackupJson);
     document.getElementById("downloadCsv").addEventListener("click", downloadBackupCsv);
+    document.getElementById("downloadWorkbookCsv").addEventListener("click", downloadWorkbookCsv);
+    document.getElementById("downloadSummaryCsv").addEventListener("click", downloadSummaryCsv);
     document.getElementById("entryType").addEventListener("change", updateEntryType);
+    document.getElementById("cancelEdit").addEventListener("click", clearEntryForm);
     document.getElementById("investmentAction").addEventListener("change", updateInvestmentMarketFields);
     document.getElementById("investmentMarket").addEventListener("change", updateInvestmentMarketFields);
     document.getElementById("entryForm").addEventListener("submit", submitEntry);
     document.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
-      const button = target ? target.closest("[data-delete-target]") : null;
-      if (!button) return;
-      deleteRecord(button.dataset.deleteTarget, button.dataset.deleteId, button.dataset.deleteLabel);
+      const deleteButton = target ? target.closest("[data-delete-target]") : null;
+      if (deleteButton) {
+        deleteRecord(deleteButton.dataset.deleteTarget, deleteButton.dataset.deleteId, deleteButton.dataset.deleteLabel);
+        return;
+      }
+      const editButtonEl = target ? target.closest("[data-edit-target]") : null;
+      if (editButtonEl) {
+        editRecord(editButtonEl.dataset.editTarget, editButtonEl.dataset.editId, editButtonEl.dataset.editLabel);
+      }
     });
     document.getElementById("monthInput").value = initialMonth;
     document.getElementById("expenseDate").value = currentDateText();
+    document.getElementById("incomeDate").value = currentDateText();
     document.getElementById("investmentDate").value = currentDateText();
     applyTheme(localStorage.getItem(THEME_KEY) || "light");
     updateEntryType();
