@@ -264,6 +264,18 @@
     .value.positive { color: var(--increase); }
     .value.negative { color: var(--deduction); }
     .kpi-sub { margin-top: 8px; color: var(--faint); font-size: 12px; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 8px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--sky) 14%, transparent);
+      color: var(--sky);
+      font-size: 11px;
+      font-weight: 800;
+      vertical-align: middle;
+    }
     .kpi.income .dot { background: var(--increase); }
     .kpi.savings .dot { background: var(--sky); }
     .kpi.investment .dot,
@@ -726,26 +738,15 @@
         <canvas class="chart" id="cashflowChart"></canvas>
       </div>
     </section>
-    <div class="two-col">
-      <section class="section">
-        <div class="section-head" onclick="toggleSection(this)">
-          <h2><span class="section-mark"></span>現金流預測</h2>
-          <span class="toggle">▾</span>
-        </div>
-        <div class="section-body">
-          <div id="cashflowForecast" class="summary-grid"></div>
-        </div>
-      </section>
-      <section class="section">
-        <div class="section-head" onclick="toggleSection(this)">
-          <h2><span class="section-mark"></span>投資現金流與股利</h2>
-          <span class="toggle">▾</span>
-        </div>
-        <div class="section-body">
-          <div id="investmentCashflow" class="summary-grid"></div>
-        </div>
-      </section>
-    </div>
+    <section class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <h2><span class="section-mark"></span>投資現金流與股利</h2>
+        <span class="toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <div id="investmentCashflow" class="summary-grid"></div>
+      </div>
+    </section>
     <section class="section">
       <div class="section-head" onclick="toggleSection(this)">
         <h2><span class="section-mark"></span>每日明細</h2>
@@ -1574,23 +1575,13 @@
         </div>
       `;
     }
-    function renderCashflowForecast(forecast) {
-      const data = forecast || {};
-      const upcoming = (data.upcoming_fixed_expenses || [])
-        .map((row) => `${row.due_day} 日 ${row.name} ${money(row.amount)}`)
-        .join("、");
-      document.getElementById("cashflowForecast").innerHTML = [
-        summaryCard("距預測基準日", `${Number(data.days_remaining || 0)} 天`, data.anchor_date ? `基準日 ${displayDate(data.anchor_date)}` : ""),
-        summaryCard("預估日常花費", money(data.projected_daily_spend || 0), `每日平均 ${money(data.average_daily_spend || 0)}`, "amount-neg"),
-        summaryCard("待扣固定支出", money(data.upcoming_fixed_expense_total || 0), upcoming || "本月發薪日前沒有待扣項目", "amount-neg"),
-        summaryCard("預估月底餘額", money(data.projected_month_end_balance || 0), "月合計扣除預估日常與待扣固定支出", Number(data.projected_month_end_balance || 0) >= 0 ? "amount-pos" : "amount-neg"),
-      ].join("");
-    }
     function renderInvestmentCashflow(summary) {
       const data = summary || {};
       document.getElementById("investmentCashflow").innerHTML = [
         summaryCard("買入", money(data.buy_total || 0), `${Number(data.buy_count || 0)} 筆`, "amount-neg"),
-        summaryCard("賣出", money(data.sell_total || 0), `${Number(data.sell_count || 0)} 筆`, "amount-pos"),
+        summaryCard("賣出毛額", money(data.sell_total || 0), `${Number(data.sell_count || 0)} 筆`, "amount-pos"),
+        summaryCard("賣出扣款", money(data.sell_cost_total || 0), `手續費 ${money(data.sell_fee_total || 0)}，稅費 ${money(data.sell_tax_total || 0)}`, "amount-neg"),
+        summaryCard("賣出淨額", money(data.sell_net_total || 0), "扣除手續費與稅費後", "amount-pos"),
         summaryCard("現金股利", money(data.cash_dividend_total || 0), `USD 原幣 ${Number(data.us_cash_dividend_original || 0).toLocaleString()}，${Number(data.cash_dividend_count || 0)} 筆`, "amount-pos"),
         summaryCard("配股", `${Number(data.stock_dividend_quantity || 0).toLocaleString()} 股`, `${Number(data.stock_dividend_count || 0)} 筆`),
       ].join("");
@@ -1725,6 +1716,7 @@
       const dataRows = payload.rows || [];
       const incomeRows = payload.incomes || [];
       const fixedExpenseRows = payload.fixed_expenses || [];
+      const fixedExpenseDisplayTotal = fixedExpenseRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
       const investmentRows = payload.investment_records || [];
       const investmentSellRows = investmentRows.filter((row) => isSellAction(row.action));
       const incomeDetailRows = [
@@ -1834,11 +1826,11 @@
           </tr>
         `).join("")
         : `<tr><td colspan="4" class="empty">這個月份尚無收入</td></tr>`;
-      document.getElementById("fixedExpenseTitle").textContent = `固定支出 ${money(summary.fixed_expense_total || 0)}`;
+      document.getElementById("fixedExpenseTitle").textContent = `固定支出與儲蓄 ${money(fixedExpenseDisplayTotal)}`;
       document.getElementById("fixedExpenseRows").innerHTML = fixedExpenseRows.length
         ? fixedExpenseRows.map((row) => `
           <tr>
-            <td>${escapeHtml(row.name)}</td>
+            <td>${escapeHtml(row.name)}${row.is_savings ? " <span class=\"tag\">儲蓄</span>" : ""}</td>
             <td>${row.due_day ? `${Number(row.due_day)} 日` : ""}</td>
             <td class="amount-neg"><strong>${Number(row.amount || 0).toLocaleString()}</strong></td>
             <td class="action-col">${editButton("fixed", row.id, `固定支出 ${row.name}`)}${trashButton("fixed", row.id, `固定支出 ${row.name}`)}</td>
@@ -1867,7 +1859,6 @@
       lastCashflowSteps = summary.cashflow_steps || [];
       drawMonthChart(lastMonthlyTotals);
       drawCashflowChart(lastCashflowSteps);
-      renderCashflowForecast(summary.cashflow_forecast || {});
       renderInvestmentCashflow(summary.investment_cashflow || {});
       renderAccountingChecks(summary.accounting_checks || []);
     }
