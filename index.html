@@ -1732,20 +1732,135 @@
       const item = ((lastPayload?.summary?.category_totals) || []).find((row) => row.key === key);
       return Math.round(Number(item?.value || 0));
     }
-    function groupInvestmentsByAsset(rows) {
+    function investmentAssetKey(row) {
+      return row.asset || row.stock_name || row.display_name || "未命名";
+    }
+    function investmentDisplayName(row) {
+      const asset = row.asset || "";
+      const name = row.stock_name || row.display_name || "";
+      if (asset && name && asset !== name) return `${asset} ${name}`;
+      return asset || name || "未命名";
+    }
+    function investmentExchangeRate(row) {
+      const rate = Number(row.exchange_rate || 0);
+      if (rate > 0) return rate;
+      const amount = Number(row.amount || 0);
+      const original = Number(row.amount_original || 0);
+      if (amount > 0 && original > 0) return amount / original;
+      return 1;
+    }
+    function investmentGrossTwd(row) {
+      const amount = Number(row.amount || 0);
+      if (amount > 0) return amount;
+      const original = Number(row.amount_original || 0);
+      if (original > 0) return original * investmentExchangeRate(row);
+      const quantity = Number(row.quantity || 0);
+      const price = Number(row.price || 0);
+      if (quantity > 0 && price > 0) return quantity * price * investmentExchangeRate(row);
+      return 0;
+    }
+    function isTaiwanEtf(row) {
+      return /^00[0-9A-Z]+$/i.test(String(row.asset || "")) || /ETF/i.test(String(row.stock_name || row.display_name || ""));
+    }
+    function isUsEtf(row) {
+      return new Set(["VT", "QQQM", "VOO", "QQQ", "VTI", "SMH", "SOXQ", "XLP", "XLU", "SCHD"]).has(String(row.asset || "").toUpperCase());
+    }
+    function investmentSellCosts(row) {
+      const gross = investmentGrossTwd(row);
+      if (gross <= 0) return { fee: 0, tax: 0, total: 0 };
+      const market = String(row.market || "TW").toUpperCase();
+      if (market === "US") {
+        const grossOriginal = Number(row.amount_original || 0) || (gross / investmentExchangeRate(row));
+        const feeOriginal = isUsEtf(row) ? 3 : grossOriginal * 0.0008;
+        const taxOriginal = grossOriginal * 0.0000206;
+        const rate = investmentExchangeRate(row);
+        const fee = feeOriginal * rate;
+        const tax = taxOriginal * rate;
+        return { fee, tax, total: fee + tax };
+      }
+      const fee = Math.floor(gross * 0.001425 * 0.28);
+      const tax = Math.floor(gross * (isTaiwanEtf(row) ? 0.001 : 0.003));
+      return { fee, tax, total: fee + tax };
+    }
+    function analyzeInvestments(rows) {
       const map = new Map();
       for (const row of rows || []) {
-        if (!isBuyAction(row.action)) continue;
-        const key = row.asset || row.stock_name || "未命名";
-        const item = map.get(key) || { asset: key, quantity: 0, amount: 0 };
-        item.quantity += Number(row.quantity || 0);
-        item.amount += Number(row.amount || 0);
+        const action = normalizeInvestmentAction(row.action);
+        if (!["buy", "sell", "stock_dividend"].includes(action)) continue;
+        const key = investmentAssetKey(row);
+        const item = map.get(key) || { asset: investmentDisplayName(row), quantity: 0, amount: 0 };
+        const quantity = Number(row.quantity || 0);
+        if (action === "buy") {
+          item.quantity += quantity;
+          item.amount += Number(row.amount || 0);
+        } else if (action === "stock_dividend") {
+          item.quantity += quantity;
+        } else if (action === "sell") {
+          const average = item.quantity ? item.amount / item.quantity : 0;
+          const cost = average * quantity;
+          item.quantity -= quantity;
+          item.amount = Math.max(0, item.amount - cost);
+        }
         map.set(key, item);
       }
-      return Array.from(map.values()).map((row) => ({
+      const holdings = Array.from(map.values()).map((row) => ({
         ...row,
         average: row.quantity ? row.amount / row.quantity : "",
-      }));
+      })).filter((row) => Math.abs(Number(row.quantity || 0)) > 0.000001 || Math.round(Number(row.amount || 0)) !== 0);
+
+      const lots = new Map();
+      const saleRows = [];
+      const sortedRows = [...(rows || [])].sort((a, b) => String(a.record_date || "").localeCompare(String(b.record_date || "")));
+      for (const row of sortedRows) {
+        const action = normalizeInvestmentAction(row.action);
+        const key = investmentAssetKey(row);
+        const lot = lots.get(key) || { quantity: 0, cost: 0 };
+        const quantity = Number(row.quantity || 0);
+        if (action === "buy") {
+          lot.quantity += quantity;
+          lot.cost += Number(row.amount || 0);
+          lots.set(key, lot);
+          continue;
+        }
+        if (action === "stock_dividend") {
+          lot.quantity += quantity;
+          lots.set(key, lot);
+          continue;
+        }
+        if (action !== "sell") continue;
+        const averageCost = lot.quantity > 0 ? lot.cost / lot.quantity : 0;
+        const soldCost = averageCost * quantity;
+        const gross = investmentGrossTwd(row);
+        const costs = investmentSellCosts(row);
+        const net = gross - costs.total;
+        saleRows.push({
+          rawDate: row.record_date,
+          date: displayDate(row.record_date),
+          asset: investmentDisplayName(row),
+          quantity,
+          gross,
+          fee: costs.fee,
+          tax: costs.tax,
+          net,
+          cost: soldCost,
+          profit: net - soldCost,
+        });
+        lot.quantity -= quantity;
+        lot.cost = Math.max(0, lot.cost - soldCost);
+        lots.set(key, lot);
+      }
+      const saleTotal = saleRows.reduce((sum, row) => ({
+        gross: sum.gross + row.gross,
+        fee: sum.fee + row.fee,
+        tax: sum.tax + row.tax,
+        net: sum.net + row.net,
+        cost: sum.cost + row.cost,
+        profit: sum.profit + row.profit,
+      }), { gross: 0, fee: 0, tax: 0, net: 0, cost: 0, profit: 0 });
+      return { holdings, saleRows, saleTotal };
+    }
+    function groupInvestmentsByAsset(rows) {
+      return analyzeInvestments(rows).holdings;
     }
     function downloadXlsx() {
       if (!lastPayload) return;
@@ -1762,7 +1877,18 @@
         ...fixedNonSavings.map((row) => ({ label: row.name, budget: Math.round(Number(row.template_amount ?? row.amount ?? 0)), actual: Math.round(Number(row.amount || 0)) })),
         { label: "其他", budget: bigCategoryValue("others"), actual: bigCategoryValue("others") },
       ];
-      const detailRows = groupInvestmentsByAsset(lastPayload.investment_records || []);
+      const investmentHistory = lastPayload.investment_records_to_date || lastPayload.investment_records || [];
+      const investmentAnalysis = analyzeInvestments(investmentHistory);
+      const detailRows = investmentAnalysis.holdings;
+      const saleRows = investmentAnalysis.saleRows.filter((row) => String(row.rawDate || "").startsWith(monthText));
+      const saleTotal = saleRows.reduce((sum, row) => ({
+        gross: sum.gross + row.gross,
+        fee: sum.fee + row.fee,
+        tax: sum.tax + row.tax,
+        net: sum.net + row.net,
+        cost: sum.cost + row.cost,
+        profit: sum.profit + row.profit,
+      }), { gross: 0, fee: 0, tax: 0, net: 0, cost: 0, profit: 0 });
       const rows = new Map();
       function add(row, col, value, style = 0) {
         const cells = rows.get(row) || [];
@@ -1801,10 +1927,30 @@
       const rateRow = stockStart + Math.max(detailRows.length, 1) + 1;
       add(rateRow, 2, "匯率", 3);
       add(rateRow, 5, exchangeRate, 4);
+      const saleStart = rateRow + 2;
+      ["賣出日期", "標的", "股數", "賣出毛額", "扣款", "賣出淨額", "推估成本", "損益"].forEach((label, index) => add(saleStart, 2 + index, label, 1));
+      saleRows.forEach((item, index) => {
+        const row = saleStart + 1 + index;
+        add(row, 2, item.date, 3);
+        add(row, 3, item.asset, 3);
+        add(row, 4, item.quantity, 4);
+        add(row, 5, Math.round(item.gross), 2);
+        add(row, 6, Math.round(item.fee + item.tax), 2);
+        add(row, 7, Math.round(item.net), 2);
+        add(row, 8, Math.round(item.cost), 2);
+        add(row, 9, Math.round(item.profit), 2);
+      });
+      const saleTotalRow = saleStart + Math.max(saleRows.length, 1) + 1;
+      add(saleTotalRow, 3, "賣出合計", 1);
+      add(saleTotalRow, 5, Math.round(saleTotal.gross), 2);
+      add(saleTotalRow, 6, Math.round(saleTotal.fee + saleTotal.tax), 2);
+      add(saleTotalRow, 7, Math.round(saleTotal.net), 2);
+      add(saleTotalRow, 8, Math.round(saleTotal.cost), 2);
+      add(saleTotalRow, 9, Math.round(saleTotal.profit), 2);
       const rowXml = Array.from(rows.entries()).sort((a, b) => a[0] - b[0]).map(([row, cells]) => `<row r="${row}">${cells.join("")}</row>`).join("");
       const mergeEnd = detailStart + Math.max(detailRows.length - 1, 0);
       const merges = [`<mergeCell ref="C${detailStart}:C${mergeEnd}"/>`, `<mergeCell ref="B${rateRow}:D${rateRow}"/>`].join("");
-      const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView showGridLines="1" workbookViewId="0"/></sheetViews><cols><col min="2" max="2" width="13" customWidth="1"/><col min="3" max="3" width="16" customWidth="1"/><col min="4" max="6" width="13" customWidth="1"/><col min="7" max="18" width="12" customWidth="1"/></cols><sheetData>${rowXml}</sheetData><mergeCells count="2">${merges}</mergeCells></worksheet>`;
+      const sheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView showGridLines="1" workbookViewId="0"/></sheetViews><cols><col min="2" max="2" width="13" customWidth="1"/><col min="3" max="3" width="18" customWidth="1"/><col min="4" max="9" width="13" customWidth="1"/><col min="10" max="18" width="12" customWidth="1"/></cols><sheetData>${rowXml}</sheetData><mergeCells count="2">${merges}</mergeCells></worksheet>`;
       const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="$#,##0"/></numFmts><fonts count="2"><font><sz val="12"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="12"/><name val="Microsoft JhengHei"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF8FAF7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="medium"><color rgb="FF000000"/></left><right style="medium"><color rgb="FF000000"/></right><top style="medium"><color rgb="FF000000"/></top><bottom style="medium"><color rgb="FF000000"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="164" fontId="0" fillId="0" borderId="1" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
       const files = [
         { name: "[Content_Types].xml", content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>` },
