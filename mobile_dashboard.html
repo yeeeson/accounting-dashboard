@@ -694,7 +694,7 @@
       <div class="kpi"><div class="kpi-label">月合計</div><div class="value" id="monthTotal">0 元</div><div class="kpi-sub">收入 + 賣出 - 日常 - 固定 - 買入</div></div>
       <div class="kpi income"><div class="kpi-label"><span class="dot"></span>收入</div><div class="value" id="incomeTotal">0 元</div><div class="kpi-sub">本月收入 + 投資賣出</div></div>
       <div class="kpi savings"><div class="kpi-label"><span class="dot"></span>儲蓄</div><div class="value" id="savingsTotal">0 元</div><div class="kpi-sub">固定支出中的儲蓄</div></div>
-      <div class="kpi investment"><div class="kpi-label"><span class="dot"></span>投資</div><div class="value" id="investmentTotal">0 元</div><div class="kpi-sub">投資買入金額</div></div>
+      <div class="kpi investment"><div class="kpi-label"><span class="dot"></span>投資</div><div class="value" id="investmentTotal">0 元</div><div class="kpi-sub">買入成交金額 + 估算手續費</div></div>
       <div class="kpi expense"><div class="kpi-label"><span class="dot"></span>日常消費總額</div><div class="value" id="netTotal">0 元</div><div class="kpi-sub">不含固定支出與投資</div></div>
       <div class="kpi"><div class="kpi-label">每日平均</div><div class="value" id="average">0 元</div><div class="kpi-sub">日常消費平均</div></div>
       <div class="kpi"><div class="kpi-label">最高單日</div><div class="value" id="maxDay">尚無</div><div class="kpi-sub">本月日常消費</div></div>
@@ -1095,7 +1095,7 @@
       exchangeRateField.hidden = !isUs;
       document.getElementById("investmentAmountLabel").textContent = isUs
         ? (isCashDividend ? "台幣入帳金額（可留空）" : isSell ? "台幣換算金額（自動，可留空）" : "台幣含費成本（TWD）")
-        : (isCashDividend ? "實收現金股利（TWD）" : "金額（TWD）");
+        : (isCashDividend ? "實收現金股利（TWD）" : isSell ? "賣出成交毛額（TWD）" : "買進成交金額（不含手續費）");
       document.getElementById("investmentOriginalAmountLabel").textContent = isCashDividend ? "現金股利（USD）" : "賣出毛額（USD）";
       document.getElementById("investmentPriceLabel").textContent = isUs ? "成交均價（USD）" : "成交均價（TWD）";
       document.getElementById("investmentQuantityLabel").textContent = isStockDividend ? "配發股數" : "股數";
@@ -1103,7 +1103,7 @@
       document.getElementById("investmentStockName").placeholder = isUs ? "例如 NVIDIA、輝達，可留空" : "例如 聯發科，可留空";
       document.getElementById("investmentAmount").placeholder = isUs
         ? (isCashDividend || isSell ? "可留空" : "例如 10000")
-        : (isCashDividend ? "例如 888" : "15000");
+        : (isCashDividend ? "例如 888" : isSell ? "例如 15000" : "例如 15000，不含手續費");
       document.getElementById("investmentOriginalAmount").placeholder = isCashDividend ? "例如 12.34" : "例如 123.45";
       document.getElementById("investmentQuantity").placeholder = isStockDividend ? "例如 20" : "5";
       exchangeInput.disabled = !isUs;
@@ -1765,6 +1765,15 @@
     function isUsEtf(row) {
       return new Set(["VT", "QQQM", "VOO", "QQQ", "VTI", "SMH", "SOXQ", "XLP", "XLU", "SCHD"]).has(String(row.asset || "").toUpperCase());
     }
+    function investmentBuyFee(row) {
+      const amount = Number(row.amount || 0);
+      if (amount <= 0 || String(row.market || "TW").toUpperCase() !== "TW") return 0;
+      if (["006208", "00733"].includes(String(row.asset || "").toUpperCase())) return 1;
+      return Math.floor(amount * 0.001425 * 0.28);
+    }
+    function investmentBuyCost(row) {
+      return Number(row.amount || 0) + investmentBuyFee(row);
+    }
     function investmentSellCosts(row) {
       const gross = investmentGrossTwd(row);
       if (gross <= 0) return { fee: 0, tax: 0, total: 0 };
@@ -1792,7 +1801,7 @@
         const quantity = Number(row.quantity || 0);
         if (action === "buy") {
           item.quantity += quantity;
-          item.amount += Number(row.amount || 0);
+          item.amount += investmentBuyCost(row);
         } else if (action === "stock_dividend") {
           item.quantity += quantity;
         } else if (action === "sell") {
@@ -1818,7 +1827,7 @@
         const quantity = Number(row.quantity || 0);
         if (action === "buy") {
           lot.quantity += quantity;
-          lot.cost += Number(row.amount || 0);
+          lot.cost += investmentBuyCost(row);
           lots.set(key, lot);
           continue;
         }
