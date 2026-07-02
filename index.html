@@ -1769,7 +1769,7 @@
       const amount = Number(row.amount || 0);
       if (amount <= 0 || String(row.market || "TW").toUpperCase() !== "TW") return 0;
       if (["006208", "00733"].includes(String(row.asset || "").toUpperCase())) return 1;
-      return Math.floor(amount * 0.001425 * 0.28);
+      return Math.max(1, Math.floor(amount * 0.001425 * 0.28));
     }
     function investmentBuyCost(row) {
       return Number(row.amount || 0) + investmentBuyFee(row);
