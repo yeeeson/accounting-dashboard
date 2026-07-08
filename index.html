@@ -1123,7 +1123,7 @@
       assetField.hidden = isFx;
       stockNameField.hidden = isFx;
       document.getElementById("investmentAmountLabel").textContent = isUs
-        ? (isCashDividend ? "台幣入帳金額（可留空）" : isSell ? "台幣換算金額（自動，可留空）" : "台幣含費成本（TWD）")
+        ? (isCashDividend ? "台幣入帳金額（可留空）" : isSell ? "台幣換算金額（自動，可留空）" : "美金實付金額（USD）")
         : isFx ? "台幣支出金額（TWD）" : (isCashDividend ? "實收現金股利（TWD）" : isSell ? "賣出成交毛額（TWD）" : "買進成交金額（不含手續費）");
       document.getElementById("investmentOriginalAmountLabel").textContent = isFx ? "外幣金額" : isCashDividend ? "現金股利（USD）" : "賣出毛額（USD）";
       document.getElementById("investmentPriceLabel").textContent = isUs ? "成交均價（USD）" : "成交均價（TWD）";
@@ -1131,7 +1131,7 @@
       document.getElementById("investmentAsset").placeholder = isUs ? "例如 NVDA，可留空" : "例如 2454，可留空";
       document.getElementById("investmentStockName").placeholder = isUs ? "例如 NVIDIA、輝達，可留空" : "例如 聯發科，可留空";
       document.getElementById("investmentAmount").placeholder = isUs
-        ? (isCashDividend || isSell ? "可留空" : "例如 10000")
+        ? (isCashDividend || isSell ? "可留空" : "例如 320")
         : isFx ? "例如 10000" : (isCashDividend ? "例如 888" : isSell ? "例如 15000" : "例如 15000，不含手續費");
       document.getElementById("investmentOriginalAmount").placeholder = isFx ? "例如 312.5 或 50000" : isCashDividend ? "例如 12.34" : "例如 123.45";
       document.getElementById("investmentQuantity").placeholder = isStockDividend ? "例如 20" : "5";
