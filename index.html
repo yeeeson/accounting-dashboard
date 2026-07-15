@@ -705,8 +705,9 @@
               <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
               <div class="template-row" id="investmentTemplateRow">
                 <span class="template-label">常用模板</span>
-                <button class="template-btn" type="button" data-investment-template="tw-006208">006208 定期</button>
-                <button class="template-btn" type="button" data-investment-template="us-voo">VOO 美股</button>
+                <button class="template-btn" type="button" data-investment-template="tw-00733">00733 定期</button>
+                <button class="template-btn" type="button" data-investment-template="tw-009816">009816 定期</button>
+                <button class="template-btn" type="button" data-investment-template="us-vt">VT 美股</button>
                 <button class="template-btn" type="button" data-investment-template="us-qqqm">QQQM 美股</button>
                 <button class="template-btn" type="button" data-investment-template="fx-usd">USD 換匯</button>
                 <button class="template-btn" type="button" data-investment-template="fx-jpy">JPY 換匯</button>
@@ -1100,9 +1101,10 @@
       setValue("investmentDate", currentDateText());
       ["investmentAmount", "investmentOriginalAmount", "investmentQuantity", "investmentExchangeRate", "investmentPrice", "investmentNote"].forEach((id) => setValue(id, ""));
       const templates = {
-        "tw-006208": { mode: "tw_trade", asset: "006208", stockName: "", note: "006208 定期定額", exchangeRate: "1" },
-        "us-voo": { mode: "us_trade", asset: "VOO", stockName: "Vanguard S&P 500 ETF", note: "VOO 美股定期定額" },
-        "us-qqqm": { mode: "us_trade", asset: "QQQM", stockName: "Invesco NASDAQ 100 ETF", note: "QQQM 美股定期定額" },
+        "tw-00733": { mode: "tw_trade", asset: "00733", stockName: "", note: "00733 定期定額", exchangeRate: "1" },
+        "tw-009816": { mode: "tw_trade", asset: "009816", stockName: "", note: "009816 定期定額", exchangeRate: "1" },
+        "us-vt": { mode: "us_trade", asset: "VT", stockName: "Vanguard Total World Stock ETF", amount: "250.2", note: "VT 美股定期定額" },
+        "us-qqqm": { mode: "us_trade", asset: "QQQM", stockName: "Invesco NASDAQ 100 ETF", amount: "250.2", note: "QQQM 美股定期定額" },
         "fx-usd": { mode: "fx_exchange", currency: "USD", note: "USD 換匯" },
         "fx-jpy": { mode: "fx_exchange", currency: "JPY", note: "JPY 換匯" },
         "cash-dividend": { mode: "dividend", action: "cash_dividend", market: "US", currency: "USD", note: "配息" },
@@ -1116,14 +1118,16 @@
       setValue("investmentAsset", item.asset || "");
       setValue("investmentStockName", item.stockName || "");
       setValue("investmentNote", item.note || "");
+      if (item.amount) setValue("investmentAmount", item.amount);
       if (item.exchangeRate) setValue("investmentExchangeRate", item.exchangeRate);
       updateInvestmentMarketFields();
       setEntryStatus(`已套用模板：${investmentTemplateLabel(template)}`);
     }
     function investmentTemplateLabel(template) {
       return {
-        "tw-006208": "006208 定期",
-        "us-voo": "VOO 美股",
+        "tw-00733": "00733 定期",
+        "tw-009816": "009816 定期",
+        "us-vt": "VT 美股",
         "us-qqqm": "QQQM 美股",
         "fx-usd": "USD 換匯",
         "fx-jpy": "JPY 換匯",
@@ -2011,7 +2015,7 @@
     function investmentBuyFee(row) {
       const amount = Number(row.amount || 0);
       if (amount <= 0 || String(row.market || "TW").toUpperCase() !== "TW") return 0;
-      if (["006208", "00733"].includes(String(row.asset || "").toUpperCase())) return 1;
+      if (["00733", "009816"].includes(String(row.asset || "").toUpperCase())) return 1;
       return Math.max(1, Math.floor(amount * 0.001425 * 0.28));
     }
     function investmentBuyCost(row) {
