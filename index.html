@@ -1095,8 +1095,13 @@
     }
     function updateInvestmentMarketFields() {
       const marketInput = document.getElementById("investmentMarket");
-      const market = marketInput.value;
-      const action = document.getElementById("investmentAction").value;
+      const actionInput = document.getElementById("investmentAction");
+      let market = marketInput.value;
+      let action = actionInput.value;
+      if (market === "FX" && !isFxExchangeAction(action)) {
+        actionInput.value = "fx_exchange";
+        action = "fx_exchange";
+      }
       const isUs = market === "US";
       const isSell = isSellAction(action);
       const isCashDividend = isCashDividendAction(action);
@@ -1111,7 +1116,10 @@
       const priceField = document.getElementById("investmentPriceField");
       const assetField = document.getElementById("investmentAssetField");
       const stockNameField = document.getElementById("investmentStockNameField");
-      if (isFx) marketInput.value = "FX";
+      if (isFx) {
+        marketInput.value = "FX";
+        market = "FX";
+      }
       currencyInput.value = isFx
         ? (["USD", "JPY"].includes(currencyInput.value) ? currencyInput.value : "USD")
         : isUs ? "USD" : "TWD";
@@ -1179,11 +1187,11 @@
       }
       const investmentAction = readValue("investmentAction");
       const investmentMarket = readValue("investmentMarket");
-      const normalizedAction = normalizeInvestmentAction(investmentAction);
+      const normalizedAction = investmentMarket === "FX" ? "fx_exchange" : normalizeInvestmentAction(investmentAction);
       return {
         type,
         date: readValue("investmentDate"),
-        action: investmentAction,
+        action: normalizedAction,
         market: investmentMarket,
         currency: readValue("investmentCurrency"),
         asset: readValue("investmentAsset"),
