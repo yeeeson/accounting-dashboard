@@ -182,6 +182,29 @@
     }
     .entry-field.wide { grid-column: span 2; }
     .entry-field.full { grid-column: 1 / -1; }
+    .template-row {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0 2px;
+    }
+    .template-label {
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 800;
+      margin-right: 2px;
+    }
+    .template-btn {
+      padding: 7px 10px;
+      border: 1px solid var(--rule);
+      background: var(--surface-soft);
+      color: var(--ink);
+      font-size: 12px;
+      box-shadow: none;
+    }
+    .template-btn:hover { background: var(--surface); }
     .entry-actions {
       display: flex;
       align-items: center;
@@ -667,6 +690,7 @@
           </div>
           <div class="entry-group" data-entry-group="investment" hidden>
             <div class="entry-grid">
+              <div class="entry-field"><label for="investmentMode">輸入模式</label><select id="investmentMode"><option value="tw_trade">台股交易</option><option value="us_trade">美股交易</option><option value="fx_exchange">換匯</option><option value="dividend">股利 / 配股</option></select></div>
               <div class="entry-field"><label for="investmentDate">日期</label><input id="investmentDate" inputmode="numeric" maxlength="8" placeholder="20260606"></div>
               <div class="entry-field"><label for="investmentAction">動作</label><select id="investmentAction"><option value="buy">買入</option><option value="sell">賣出</option><option value="cash_dividend">配息</option><option value="stock_dividend">配股</option><option value="fx_exchange">換匯</option></select></div>
               <div class="entry-field"><label for="investmentMarket">市場</label><select id="investmentMarket"><option value="TW">台股</option><option value="US">美股</option><option value="FX">換匯</option></select></div>
@@ -679,6 +703,15 @@
               <div class="entry-field" id="investmentExchangeRateField"><label for="investmentExchangeRate">匯率</label><input id="investmentExchangeRate" inputmode="decimal" placeholder="1"></div>
               <div class="entry-field" id="investmentPriceField"><label for="investmentPrice" id="investmentPriceLabel">成交均價</label><input id="investmentPrice" inputmode="decimal" placeholder="可留空"></div>
               <div class="entry-field wide"><label for="investmentNote">備註</label><input id="investmentNote" placeholder="可留空"></div>
+              <div class="template-row" id="investmentTemplateRow">
+                <span class="template-label">常用模板</span>
+                <button class="template-btn" type="button" data-investment-template="tw-006208">006208 定期</button>
+                <button class="template-btn" type="button" data-investment-template="us-voo">VOO 美股</button>
+                <button class="template-btn" type="button" data-investment-template="us-qqqm">QQQM 美股</button>
+                <button class="template-btn" type="button" data-investment-template="fx-usd">USD 換匯</button>
+                <button class="template-btn" type="button" data-investment-template="fx-jpy">JPY 換匯</button>
+                <button class="template-btn" type="button" data-investment-template="cash-dividend">配息</button>
+              </div>
             </div>
           </div>
           <div class="entry-actions">
@@ -745,6 +778,15 @@
       </div>
       <div class="section-body">
         <div id="investmentCashflow" class="summary-grid"></div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="section-head" onclick="toggleSection(this)">
+        <h2><span class="section-mark"></span>主動投資資金池</h2>
+        <span class="toggle">▾</span>
+      </div>
+      <div class="section-body">
+        <div id="activeInvestmentPool" class="summary-grid"></div>
       </div>
     </section>
     <section class="section">
@@ -1008,6 +1050,86 @@
     function isFxExchangeAction(action) {
       return normalizeInvestmentAction(action) === "fx_exchange";
     }
+    function investmentModeFromState(action, market) {
+      const normalized = normalizeInvestmentAction(action);
+      if (market === "FX" || normalized === "fx_exchange") return "fx_exchange";
+      if (normalized === "cash_dividend" || normalized === "stock_dividend") return "dividend";
+      if (market === "US") return "us_trade";
+      return "tw_trade";
+    }
+    function setInvestmentMode(mode, { preserveAction = false } = {}) {
+      const modeInput = document.getElementById("investmentMode");
+      const actionInput = document.getElementById("investmentAction");
+      const marketInput = document.getElementById("investmentMarket");
+      const currencyInput = document.getElementById("investmentCurrency");
+      modeInput.value = mode;
+      if (mode === "fx_exchange") {
+        marketInput.value = "FX";
+        actionInput.value = "fx_exchange";
+        if (!["USD", "JPY"].includes(currencyInput.value)) currencyInput.value = "USD";
+        return;
+      }
+      if (mode === "us_trade") {
+        marketInput.value = "US";
+        currencyInput.value = "USD";
+        if (!preserveAction || isFxExchangeAction(actionInput.value) || isCashDividendAction(actionInput.value) || isStockDividendAction(actionInput.value)) {
+          actionInput.value = "buy";
+        }
+        return;
+      }
+      if (mode === "dividend") {
+        if (marketInput.value === "FX") marketInput.value = "TW";
+        currencyInput.value = marketInput.value === "US" ? "USD" : "TWD";
+        if (!isCashDividendAction(actionInput.value) && !isStockDividendAction(actionInput.value)) actionInput.value = "cash_dividend";
+        return;
+      }
+      marketInput.value = "TW";
+      currencyInput.value = "TWD";
+      if (!preserveAction || isFxExchangeAction(actionInput.value) || isCashDividendAction(actionInput.value) || isStockDividendAction(actionInput.value)) {
+        actionInput.value = "buy";
+      }
+    }
+    function updateInvestmentModeFromState() {
+      const action = document.getElementById("investmentAction").value;
+      const market = document.getElementById("investmentMarket").value;
+      document.getElementById("investmentMode").value = investmentModeFromState(action, market);
+    }
+    function applyInvestmentTemplate(template) {
+      setValue("entryType", "investment");
+      updateEntryType();
+      setValue("investmentDate", currentDateText());
+      ["investmentAmount", "investmentOriginalAmount", "investmentQuantity", "investmentExchangeRate", "investmentPrice", "investmentNote"].forEach((id) => setValue(id, ""));
+      const templates = {
+        "tw-006208": { mode: "tw_trade", asset: "006208", stockName: "", note: "006208 定期定額", exchangeRate: "1" },
+        "us-voo": { mode: "us_trade", asset: "VOO", stockName: "Vanguard S&P 500 ETF", note: "VOO 美股定期定額" },
+        "us-qqqm": { mode: "us_trade", asset: "QQQM", stockName: "Invesco NASDAQ 100 ETF", note: "QQQM 美股定期定額" },
+        "fx-usd": { mode: "fx_exchange", currency: "USD", note: "USD 換匯" },
+        "fx-jpy": { mode: "fx_exchange", currency: "JPY", note: "JPY 換匯" },
+        "cash-dividend": { mode: "dividend", action: "cash_dividend", market: "US", currency: "USD", note: "配息" },
+      };
+      const item = templates[template];
+      if (!item) return;
+      setInvestmentMode(item.mode);
+      if (item.market) setValue("investmentMarket", item.market);
+      if (item.action) setValue("investmentAction", item.action);
+      if (item.currency) setValue("investmentCurrency", item.currency);
+      setValue("investmentAsset", item.asset || "");
+      setValue("investmentStockName", item.stockName || "");
+      setValue("investmentNote", item.note || "");
+      if (item.exchangeRate) setValue("investmentExchangeRate", item.exchangeRate);
+      updateInvestmentMarketFields();
+      setEntryStatus(`已套用模板：${investmentTemplateLabel(template)}`);
+    }
+    function investmentTemplateLabel(template) {
+      return {
+        "tw-006208": "006208 定期",
+        "us-voo": "VOO 美股",
+        "us-qqqm": "QQQM 美股",
+        "fx-usd": "USD 換匯",
+        "fx-jpy": "JPY 換匯",
+        "cash-dividend": "配息",
+      }[template] || template;
+    }
     function normalizeInvestmentAction(action) {
       const text = String(action ?? "").trim().toLowerCase();
       if (!text) return "buy";
@@ -1094,14 +1216,43 @@
       setEntryStatus("");
     }
     function updateInvestmentMarketFields() {
+      const modeInput = document.getElementById("investmentMode");
       const marketInput = document.getElementById("investmentMarket");
       const actionInput = document.getElementById("investmentAction");
+      let mode = modeInput.value || investmentModeFromState(actionInput.value, marketInput.value);
       let market = marketInput.value;
       let action = actionInput.value;
-      if (market === "FX" && !isFxExchangeAction(action)) {
+      if (mode === "fx_exchange") {
+        marketInput.value = "FX";
         actionInput.value = "fx_exchange";
+        market = "FX";
         action = "fx_exchange";
+      } else if (mode === "us_trade") {
+        marketInput.value = "US";
+        market = "US";
+        if (isFxExchangeAction(action) || isCashDividendAction(action) || isStockDividendAction(action)) {
+          actionInput.value = "buy";
+          action = "buy";
+        }
+      } else if (mode === "dividend") {
+        if (market === "FX") {
+          marketInput.value = "TW";
+          market = "TW";
+        }
+        if (!isCashDividendAction(action) && !isStockDividendAction(action)) {
+          actionInput.value = "cash_dividend";
+          action = "cash_dividend";
+        }
+      } else {
+        mode = "tw_trade";
+        marketInput.value = "TW";
+        market = "TW";
+        if (isFxExchangeAction(action) || isCashDividendAction(action) || isStockDividendAction(action)) {
+          actionInput.value = "buy";
+          action = "buy";
+        }
       }
+      modeInput.value = mode;
       const isUs = market === "US";
       const isSell = isSellAction(action);
       const isCashDividend = isCashDividendAction(action);
@@ -1331,6 +1482,7 @@
         setValue("investmentDate", inputDate(row.record_date));
         setValue("investmentAction", normalizeInvestmentAction(row.action));
         setValue("investmentMarket", row.market || "TW");
+        updateInvestmentModeFromState();
         setValue("investmentCurrency", row.currency || (row.market === "US" ? "USD" : "TWD"));
         setValue("investmentAsset", row.asset || "");
         setValue("investmentStockName", row.stock_name || row.display_name || "");
@@ -1347,6 +1499,7 @@
         setValue("investmentDate", inputDate(row.record_date));
         setValue("investmentAction", "fx_exchange");
         setValue("investmentMarket", "FX");
+        updateInvestmentModeFromState();
         setValue("investmentCurrency", row.currency || "USD");
         setValue("investmentAsset", "");
         setValue("investmentStockName", "");
@@ -1639,6 +1792,17 @@
         summaryCard("賣出淨額", money(data.sell_net_total || 0), "扣除手續費與稅費後", "amount-pos"),
         summaryCard("現金股利", money(data.cash_dividend_total || 0), `USD 原幣 ${Number(data.us_cash_dividend_original || 0).toLocaleString()}，${Number(data.cash_dividend_count || 0)} 筆`, "amount-pos"),
         summaryCard("配股", `${Number(data.stock_dividend_quantity || 0).toLocaleString()} 股`, `${Number(data.stock_dividend_count || 0)} 筆`),
+      ].join("");
+    }
+    function renderActiveInvestmentPool(summary) {
+      const data = summary || {};
+      document.getElementById("activeInvestmentPool").innerHTML = [
+        summaryCard("剩餘可投入", money(data.remaining || 0), `預算 ${money(data.budget || 0)}`, Number(data.remaining || 0) < 0 ? "amount-neg" : "amount-pos"),
+        summaryCard("已用資金", money(data.used_total || 0), "買入 + 換匯 - 賣出淨額", "amount-neg"),
+        summaryCard("台股投入", money(data.tw_buy_total || 0), "含估算買進手續費"),
+        summaryCard("美股投入", money(data.us_buy_total || 0), "TWD 等值成本"),
+        summaryCard("換匯投入", money(data.fx_outflow_total || 0), "USD / JPY 存款投入"),
+        summaryCard("賣出回補", money(data.stock_sell_net_total || 0), "扣除手續費與稅費後", "amount-pos"),
       ].join("");
     }
     function renderCurrencyDeposits(summaryRows, rows) {
@@ -2208,6 +2372,7 @@
       drawMonthChart(lastMonthlyTotals);
       drawCashflowChart(lastCashflowSteps);
       renderInvestmentCashflow(summary.investment_cashflow || {});
+      renderActiveInvestmentPool(summary.active_investment_pool || {});
       renderCurrencyDeposits(summary.currency_deposit_summary || [], currencyDepositRows);
       renderAccountingChecks(summary.accounting_checks || []);
     }
@@ -2232,8 +2397,23 @@
     document.getElementById("downloadXlsx").addEventListener("click", downloadXlsx);
     document.getElementById("entryType").addEventListener("change", updateEntryType);
     document.getElementById("cancelEdit").addEventListener("click", clearEntryForm);
-    document.getElementById("investmentAction").addEventListener("change", updateInvestmentMarketFields);
-    document.getElementById("investmentMarket").addEventListener("change", updateInvestmentMarketFields);
+    document.getElementById("investmentMode").addEventListener("change", () => {
+      setInvestmentMode(document.getElementById("investmentMode").value);
+      updateInvestmentMarketFields();
+    });
+    document.getElementById("investmentAction").addEventListener("change", () => {
+      updateInvestmentModeFromState();
+      updateInvestmentMarketFields();
+    });
+    document.getElementById("investmentMarket").addEventListener("change", () => {
+      updateInvestmentModeFromState();
+      updateInvestmentMarketFields();
+    });
+    document.getElementById("investmentTemplateRow").addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target.closest("[data-investment-template]") : null;
+      if (!target) return;
+      applyInvestmentTemplate(target.dataset.investmentTemplate);
+    });
     document.getElementById("entryForm").addEventListener("submit", submitEntry);
     document.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
